@@ -9,23 +9,25 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
+import { AnimatedEntry } from '../components/AnimatedScreen';
 
 const Colors = {
-    bg: '#0F0F1A',
-    surface: '#1A1A2E',
-    surfaceLight: '#252540',
-    primary: '#7C5CFC',
-    primaryDark: '#6347D4',
-    text: '#EEEEF6',
-    textSecondary: '#9494B8',
-    textMuted: '#5E5E80',
-    border: '#2E2E4A',
-    error: '#FF6B6B',
-    success: '#4ECB71',
+    bg: '#000000',
+    surface: '#0A0A0A',
+    surfaceLight: '#141414',
+    primary: '#FFFFFF',
+    primaryDark: '#D4D4D4',
+    text: '#FFFFFF',
+    textSecondary: '#A3A3A3',
+    textMuted: '#525252',
+    border: '#333333',
+    error: '#FF4444',
+    success: '#00FF00',
 };
 
 export default function LoginScreen() {
@@ -114,107 +116,113 @@ export default function LoginScreen() {
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
             >
-                <View style={styles.header}>
-                    <Text style={styles.logo}>🗓️</Text>
-                    <Text style={styles.title}>Day Planner</Text>
-                    <Text style={styles.subtitle}>
-                        {isSignup ? 'Create your account' : 'Welcome back!'}
-                    </Text>
-                </View>
+                <AnimatedEntry type="scaleIn" delay={0}>
+                    <View style={styles.header}>
+                        <Image
+                            source={require('../assets/images/icon.png')}
+                            style={styles.logoImage}
+                        />
+                        <Text style={styles.subtitle}>
+                            {isSignup ? 'Create your account' : 'Welcome back!'}
+                        </Text>
+                    </View>
+                </AnimatedEntry>
 
-                <View style={styles.form}>
-                    {isSignup && (
+                <AnimatedEntry delay={200}>
+                    <View style={styles.form}>
+                        {isSignup && (
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>NAME</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={name}
+                                    onChangeText={setName}
+                                    placeholder="Your full name"
+                                    placeholderTextColor={Colors.textMuted}
+                                    autoCapitalize="words"
+                                />
+                            </View>
+                        )}
+
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>NAME</Text>
+                            <Text style={styles.label}>EMAIL</Text>
                             <TextInput
                                 style={styles.input}
-                                value={name}
-                                onChangeText={setName}
-                                placeholder="Your full name"
+                                value={email}
+                                onChangeText={setEmail}
+                                placeholder="you@example.com"
                                 placeholderTextColor={Colors.textMuted}
-                                autoCapitalize="words"
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                autoCorrect={false}
                             />
                         </View>
-                    )}
 
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>EMAIL</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={email}
-                            onChangeText={setEmail}
-                            placeholder="you@example.com"
-                            placeholderTextColor={Colors.textMuted}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>PASSWORD</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={password}
-                            onChangeText={setPassword}
-                            placeholder="••••••••"
-                            placeholderTextColor={Colors.textMuted}
-                            secureTextEntry
-                        />
-                    </View>
-
-                    {isSignup && (
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>CONFIRM PASSWORD</Text>
+                            <Text style={styles.label}>PASSWORD</Text>
                             <TextInput
                                 style={styles.input}
-                                value={confirmPassword}
-                                onChangeText={setConfirmPassword}
+                                value={password}
+                                onChangeText={setPassword}
                                 placeholder="••••••••"
                                 placeholderTextColor={Colors.textMuted}
                                 secureTextEntry
                             />
                         </View>
-                    )}
 
-                    {error ? (
-                        <View style={styles.errorContainer}>
-                            <Text style={styles.errorText}>⚠️ {error}</Text>
-                        </View>
-                    ) : null}
-
-                    <TouchableOpacity
-                        style={[styles.button, loading && styles.buttonDisabled]}
-                        onPress={handleSubmit}
-                        disabled={loading}
-                        activeOpacity={0.8}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color="#fff" />
-                        ) : (
-                            <Text style={styles.buttonText}>
-                                {isSignup ? 'Create Account' : 'Log In'}
-                            </Text>
+                        {isSignup && (
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>CONFIRM PASSWORD</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={confirmPassword}
+                                    onChangeText={setConfirmPassword}
+                                    placeholder="••••••••"
+                                    placeholderTextColor={Colors.textMuted}
+                                    secureTextEntry
+                                />
+                            </View>
                         )}
-                    </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={styles.switchButton}
-                        onPress={() => {
-                            setIsSignup(!isSignup);
-                            setError('');
-                        }}
-                    >
-                        <Text style={styles.switchText}>
-                            {isSignup
-                                ? 'Already have an account? '
-                                : "Don't have an account? "}
-                            <Text style={styles.switchTextBold}>
-                                {isSignup ? 'Log In' : 'Sign Up'}
+                        {error ? (
+                            <View style={styles.errorContainer}>
+                                <Text style={styles.errorText}>⚠️ {error}</Text>
+                            </View>
+                        ) : null}
+
+                        <TouchableOpacity
+                            style={[styles.button, loading && styles.buttonDisabled]}
+                            onPress={handleSubmit}
+                            disabled={loading}
+                            activeOpacity={0.8}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.buttonText}>
+                                    {isSignup ? 'Create Account' : 'Log In'}
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.switchButton}
+                            onPress={() => {
+                                setIsSignup(!isSignup);
+                                setError('');
+                            }}
+                        >
+                            <Text style={styles.switchText}>
+                                {isSignup
+                                    ? 'Already have an account? '
+                                    : "Don't have an account? "}
+                                <Text style={styles.switchTextBold}>
+                                    {isSignup ? 'Log In' : 'Sign Up'}
+                                </Text>
                             </Text>
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+                        </TouchableOpacity>
+                    </View>
+                </AnimatedEntry>
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -235,15 +243,24 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 40,
     },
-    logo: {
-        fontSize: 64,
-        marginBottom: 12,
+    logoImage: {
+        width: 120,
+        height: 120,
+        borderRadius: 28,
+        marginBottom: 16,
     },
     title: {
         fontSize: 32,
         fontWeight: '800',
         color: Colors.text,
         marginBottom: 8,
+    },
+    tagline: {
+        fontSize: 14,
+        color: Colors.textMuted,
+        letterSpacing: 2,
+        textTransform: 'uppercase',
+        marginBottom: 4,
     },
     subtitle: {
         fontSize: 17,
@@ -300,7 +317,7 @@ const styles = StyleSheet.create({
         opacity: 0.6,
     },
     buttonText: {
-        color: '#fff',
+        color: '#000000',
         fontSize: 17,
         fontWeight: '700',
     },

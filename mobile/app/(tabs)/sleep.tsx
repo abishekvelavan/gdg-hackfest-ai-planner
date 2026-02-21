@@ -10,6 +10,7 @@ import {
 import Colors from '../../constants/Colors';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { AnimatedEntry, PulseAnimation } from '../../components/AnimatedScreen';
 
 export default function SleepScreen() {
     const { user } = useAuth();
@@ -82,33 +83,43 @@ export default function SleepScreen() {
             </View>
 
             {/* Moon */}
-            <View style={styles.moonContainer}>
-                <Text style={styles.moonEmoji}>🌙</Text>
-            </View>
+            <AnimatedEntry type="scaleIn" delay={0}>
+                <View style={styles.moonContainer}>
+                    <Text style={styles.moonEmoji}>🌙</Text>
+                </View>
+            </AnimatedEntry>
 
             {!hasLoggedSleep ? (
                 <>
                     {/* Main Sleep Button */}
-                    <Text style={styles.title}>Ready for bed?</Text>
-                    <Text style={styles.subtitle}>
-                        Tap below to log your bedtime.{'\n'}I'll calculate your optimal wake time.
-                    </Text>
+                    <AnimatedEntry delay={150}>
+                        <Text style={styles.title}>Ready for bed?</Text>
+                    </AnimatedEntry>
+                    <AnimatedEntry delay={300}>
+                        <Text style={styles.subtitle}>
+                            Tap below to log your bedtime.{'\n'}I'll calculate your optimal wake time.
+                        </Text>
+                    </AnimatedEntry>
 
-                    <TouchableOpacity
-                        style={[styles.sleepButton, isLogging && styles.sleepButtonDisabled]}
-                        onPress={logSleep}
-                        disabled={isLogging}
-                        activeOpacity={0.8}
-                    >
-                        {isLogging ? (
-                            <ActivityIndicator size="large" color="#FFF" />
-                        ) : (
-                            <>
-                                <Text style={styles.sleepButtonEmoji}>😴</Text>
-                                <Text style={styles.sleepButtonText}>Going to Sleep</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
+                    <AnimatedEntry type="scaleIn" delay={450}>
+                        <PulseAnimation intensity={0.03}>
+                            <TouchableOpacity
+                                style={[styles.sleepButton, isLogging && styles.sleepButtonDisabled]}
+                                onPress={logSleep}
+                                disabled={isLogging}
+                                activeOpacity={0.8}
+                            >
+                                {isLogging ? (
+                                    <ActivityIndicator size="large" color="#FFFFFF" />
+                                ) : (
+                                    <>
+                                        <Text style={styles.sleepButtonEmoji}>😴</Text>
+                                        <Text style={styles.sleepButtonText}>Going to Sleep</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </PulseAnimation>
+                    </AnimatedEntry>
 
                     {error ? (
                         <View style={styles.errorCard}>
@@ -219,13 +230,15 @@ const styles = StyleSheet.create({
         width: 180,
         height: 180,
         borderRadius: 90,
-        backgroundColor: Colors.sleepAccent,
+        backgroundColor: '#0A0A0A',
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: Colors.sleepAccent,
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+        shadowColor: '#FFFFFF',
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 30,
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
         elevation: 10,
         marginBottom: 24,
     },
@@ -237,7 +250,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     sleepButtonText: {
-        color: '#FFF',
+        color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '700',
     },

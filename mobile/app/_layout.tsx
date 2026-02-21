@@ -3,10 +3,12 @@ import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import 'react-native-reanimated';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
+import AnimatedSplash from '../components/AnimatedSplash';
 
 
 export { ErrorBoundary } from 'expo-router';
@@ -21,11 +23,11 @@ const CustomDarkTheme = {
   ...DarkTheme,
   colors: {
     ...DarkTheme.colors,
-    background: '#0A0A0F',
-    card: '#0F0F18',
-    text: '#EAEAFF',
-    border: '#2A2A40',
-    primary: '#6C63FF',
+    background: '#000000',
+    card: '#0A0A0A',
+    text: '#FFFFFF',
+    border: '#333333',
+    primary: '#FFFFFF',
   },
 };
 
@@ -53,6 +55,7 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   });
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
     if (error) throw error;
@@ -69,13 +72,18 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <ThemeProvider value={CustomDarkTheme}>
-        <AuthRedirect />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="login" />
-          <Stack.Screen name="welcome" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-        </Stack>
+        <View style={{ flex: 1, backgroundColor: '#000000' }}>
+          <AuthRedirect />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="login" />
+            <Stack.Screen name="welcome" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+          </Stack>
+          {showSplash && (
+            <AnimatedSplash onFinish={() => setShowSplash(false)} />
+          )}
+        </View>
       </ThemeProvider>
     </AuthProvider>
   );

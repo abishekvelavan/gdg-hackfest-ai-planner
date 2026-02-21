@@ -14,6 +14,7 @@ import { DayEvent } from '../../types';
 import { EventTile } from '../../components/EventTile';
 import { PlanCard } from '../../components/PlanCard';
 import { AffirmationCard } from '../../components/AffirmationCard';
+import { AnimatedEntry, PulseAnimation } from '../../components/AnimatedScreen';
 
 function parseEventsFromResponse(response: string): DayEvent[] {
   const events: DayEvent[] = [];
@@ -116,18 +117,28 @@ export default function DayPlanScreen() {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyEmoji}>📋</Text>
-      <Text style={styles.emptyTitle}>No plan yet</Text>
-      <Text style={styles.emptySubtitle}>
-        Tap the button below or go to Chat and say "Plan my day"
-      </Text>
-      <TouchableOpacity style={styles.generateButton} onPress={() => fetchDayPlan()}>
-        {isLoading ? (
-          <ActivityIndicator color="#FFF" />
-        ) : (
-          <Text style={styles.generateButtonText}>✨ Generate Day Plan</Text>
-        )}
-      </TouchableOpacity>
+      <AnimatedEntry type="scaleIn" delay={0}>
+        <Text style={styles.emptyEmoji}>📋</Text>
+      </AnimatedEntry>
+      <AnimatedEntry delay={150}>
+        <Text style={styles.emptyTitle}>No plan yet</Text>
+      </AnimatedEntry>
+      <AnimatedEntry delay={300}>
+        <Text style={styles.emptySubtitle}>
+          Tap the button below or go to Chat and say "Plan my day"
+        </Text>
+      </AnimatedEntry>
+      <AnimatedEntry delay={450}>
+        <PulseAnimation>
+          <TouchableOpacity style={styles.generateButton} onPress={() => fetchDayPlan()}>
+            {isLoading ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <Text style={styles.generateButtonText}>✨ Generate Day Plan</Text>
+            )}
+          </TouchableOpacity>
+        </PulseAnimation>
+      </AnimatedEntry>
     </View>
   );
 
@@ -307,7 +318,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   generateButtonText: {
-    color: '#FFF',
+    color: '#000000',
     fontSize: 16,
     fontWeight: '700',
   },

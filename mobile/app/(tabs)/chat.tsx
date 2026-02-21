@@ -16,6 +16,7 @@ import { ChatMessage } from '../../types';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { ChatBubble } from '../../components/ChatBubble';
+import { AnimatedEntry } from '../../components/AnimatedScreen';
 
 const QUICK_PROMPTS = [
     '📋 Plan my day',
@@ -77,22 +78,30 @@ export default function ChatScreen() {
 
     const renderEmptyState = () => (
         <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>💬</Text>
-            <Text style={styles.emptyTitle}>Chat with your Day Planner</Text>
-            <Text style={styles.emptySubtitle}>
-                Ask me to plan your day, check weather, scan emails, or manage todos.
-            </Text>
-            <View style={styles.quickPromptsContainer}>
-                {QUICK_PROMPTS.map((prompt) => (
-                    <TouchableOpacity
-                        key={prompt}
-                        style={styles.quickPromptChip}
-                        onPress={() => sendMessage(prompt)}
-                    >
-                        <Text style={styles.quickPromptText}>{prompt}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+            <AnimatedEntry type="scaleIn" delay={0}>
+                <Text style={styles.emptyEmoji}>💬</Text>
+            </AnimatedEntry>
+            <AnimatedEntry delay={150}>
+                <Text style={styles.emptyTitle}>Chat with your Day Planner</Text>
+            </AnimatedEntry>
+            <AnimatedEntry delay={300}>
+                <Text style={styles.emptySubtitle}>
+                    Ask me to plan your day, check weather, scan emails, or manage todos.
+                </Text>
+            </AnimatedEntry>
+            <AnimatedEntry delay={450}>
+                <View style={styles.quickPromptsContainer}>
+                    {QUICK_PROMPTS.map((prompt) => (
+                        <TouchableOpacity
+                            key={prompt}
+                            style={styles.quickPromptChip}
+                            onPress={() => sendMessage(prompt)}
+                        >
+                            <Text style={styles.quickPromptText}>{prompt}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </AnimatedEntry>
         </View>
     );
 
