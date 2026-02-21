@@ -65,6 +65,117 @@ function ChipGroup({
 }
 
 // --- Stepper Control ---
+// --- Searchable Dropdown Component ---
+function SearchableDropdown({
+    label,
+    placeholder,
+    options,
+    value,
+    onSelect,
+    keyExtractor,
+}: {
+    label: string;
+    placeholder: string;
+    options: { key: string; label: string }[];
+    value: string;
+    onSelect: (v: string) => void;
+    keyExtractor?: (item: { key: string; label: string }) => string;
+}) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+
+    const filtered = search.trim()
+        ? options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
+        : options;
+
+    return (
+        <View style={ddStyles.container}>
+            <Text style={ddStyles.label}>{label}</Text>
+            <TouchableOpacity
+                style={[ddStyles.trigger, open && ddStyles.triggerOpen]}
+                onPress={() => setOpen(!open)}
+                activeOpacity={0.7}
+            >
+                <Text style={value ? ddStyles.triggerText : ddStyles.triggerPlaceholder}>
+                    {value || placeholder}
+                </Text>
+                <Text style={ddStyles.arrow}>{open ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+            {open && (
+                <View style={ddStyles.listContainer}>
+                    <TextInput
+                        style={ddStyles.searchBox}
+                        value={search}
+                        onChangeText={setSearch}
+                        placeholder="🔍 Search..."
+                        placeholderTextColor={Colors.textMuted}
+                    />
+                    <ScrollView style={ddStyles.list} nestedScrollEnabled>
+                        {filtered.map(o => (
+                            <TouchableOpacity
+                                key={keyExtractor ? keyExtractor(o) : o.key}
+                                style={[ddStyles.item, value === o.label && ddStyles.itemSelected]}
+                                onPress={() => { onSelect(o.label); setOpen(false); setSearch(''); }}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[ddStyles.itemText, value === o.label && ddStyles.itemTextSelected]}>
+                                    {o.label}
+                                </Text>
+                                {value === o.label && <Text style={ddStyles.checkmark}>✓</Text>}
+                            </TouchableOpacity>
+                        ))}
+                        {filtered.length === 0 && (
+                            <Text style={ddStyles.emptyText}>No results found</Text>
+                        )}
+                    </ScrollView>
+                </View>
+            )}
+        </View>
+    );
+}
+
+const ddStyles = StyleSheet.create({
+    container: { marginBottom: 18 },
+    label: {
+        fontSize: 13, fontWeight: '700', color: Colors.textSecondary,
+        textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8,
+    },
+    trigger: {
+        backgroundColor: Colors.surfaceLight, borderRadius: 14,
+        paddingHorizontal: 16, paddingVertical: 15,
+        borderWidth: 1.5, borderColor: Colors.border,
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    },
+    triggerOpen: {
+        borderColor: Colors.primary,
+        borderBottomLeftRadius: 0, borderBottomRightRadius: 0,
+    },
+    triggerText: { fontSize: 16, color: Colors.text, fontWeight: '600' },
+    triggerPlaceholder: { fontSize: 16, color: Colors.textMuted },
+    arrow: { fontSize: 12, color: Colors.textSecondary },
+    listContainer: {
+        backgroundColor: Colors.surfaceLight,
+        borderWidth: 1.5, borderTopWidth: 0, borderColor: Colors.primary,
+        borderBottomLeftRadius: 14, borderBottomRightRadius: 14, overflow: 'hidden',
+    },
+    searchBox: {
+        paddingHorizontal: 14, paddingVertical: 10, fontSize: 15,
+        color: Colors.text, borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    list: { maxHeight: 200 },
+    item: {
+        paddingHorizontal: 16, paddingVertical: 13,
+        borderBottomWidth: 0.5, borderBottomColor: Colors.border + '60',
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    },
+    itemSelected: { backgroundColor: Colors.primary + '18' },
+    itemText: { fontSize: 15, color: Colors.text },
+    itemTextSelected: { color: Colors.primary, fontWeight: '700' },
+    checkmark: { fontSize: 16, color: Colors.primary, fontWeight: '700' },
+    emptyText: { color: Colors.textMuted, fontSize: 14, textAlign: 'center', paddingVertical: 20 },
+});
+
+// --- Stepper Component ---
 function Stepper({
     value,
     min,
@@ -261,13 +372,12 @@ export default function WelcomeScreen() {
         if (!selectedState) return [];
         return citiesData
             .filter((c: any) => c.state === selectedState)
-            .map((c: any) => c.name)
-            .sort();
+            .sort((a: any, b: any) => a.name.localeCompare(b.name));
     }, [selectedState]);
 
     const filteredCities = useMemo(() => {
         if (!citySearch.trim()) return citiesForState;
-        return citiesForState.filter(c => c.toLowerCase().includes(citySearch.toLowerCase()));
+        return citiesForState.filter((c: any) => c.name.toLowerCase().includes(citySearch.toLowerCase()));
     }, [citiesForState, citySearch]);
 
     // "Other" custom text values
@@ -276,7 +386,7 @@ export default function WelcomeScreen() {
     const [customHobby, setCustomHobby] = useState('');
     const [customGoal, setCustomGoal] = useState('');
 
-    const TOTAL_STEPS = 7;
+    const TOTAL_STEPS = 6;
     const isLastStep = currentStep === TOTAL_STEPS - 1;
     const isFirstStep = currentStep === 0;
 
@@ -290,10 +400,12 @@ export default function WelcomeScreen() {
 
     const canProceed = () => {
         if (currentStep === 0) return name.trim().length > 0;
-        if (currentStep === 1) return selectedState.length > 0;
-        if (currentStep === 2) return selectedCity.length > 0;
+        if (currentStep === 1) return selectedState.length > 0 && selectedCity.length > 0;
         return true;
     };
+
+    const stateOptions = useMemo(() => uniqueStates.map(s => ({ key: s, label: s })), [uniqueStates]);
+    const cityOptions = useMemo(() => citiesForState.map((c: any) => ({ key: c.id, label: c.name })), [citiesForState]);
 
     const handleNext = async () => {
         if (isLastStep) {
@@ -381,73 +493,41 @@ export default function WelcomeScreen() {
                     </>
                 );
 
-            // --- Step 1: Select State ---
+            // --- Step 1: State & City ---
             case 1:
                 return (
                     <>
-                        <Text style={styles.stepEmoji}>🗺️</Text>
-                        <Text style={styles.stepTitle}>Your State</Text>
-                        <Text style={styles.stepSubtitle}>Select your state</Text>
-                        <TextInput
-                            style={styles.searchInput}
-                            value={stateSearch}
-                            onChangeText={setStateSearch}
-                            placeholder="🔍 Search states..."
-                            placeholderTextColor={Colors.textMuted}
+                        <Text style={styles.stepEmoji}>📍</Text>
+                        <Text style={styles.stepTitle}>Where are you from?</Text>
+                        <Text style={styles.stepSubtitle}>Select your state and city</Text>
+
+                        <SearchableDropdown
+                            label="🗺️ STATE"
+                            placeholder="Select your state"
+                            options={stateOptions}
+                            value={selectedState}
+                            onSelect={(v) => { setSelectedState(v); setSelectedCity(''); }}
                         />
-                        <View style={styles.chipGroup}>
-                            {filteredStates.map(s => (
-                                <TouchableOpacity
-                                    key={s}
-                                    style={[styles.chip, selectedState === s && styles.chipSelected]}
-                                    onPress={() => { setSelectedState(s); setSelectedCity(''); setCitySearch(''); }}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={[styles.chipText, selectedState === s && styles.chipTextSelected]}>{s}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+
+                        {selectedState ? (
+                            <SearchableDropdown
+                                label="🏙️ CITY"
+                                placeholder="Select your city"
+                                options={cityOptions}
+                                value={selectedCity}
+                                onSelect={setSelectedCity}
+                                keyExtractor={(o) => o.key}
+                            />
+                        ) : null}
                     </>
                 );
 
-            // --- Step 2: Select City ---
+            // --- Step 2: Location ---
             case 2:
                 return (
                     <>
-                        <Text style={styles.stepEmoji}>🏙️</Text>
-                        <Text style={styles.stepTitle}>Your City</Text>
-                        <Text style={styles.stepSubtitle}>Select your city in {selectedState}</Text>
-                        <TextInput
-                            style={styles.searchInput}
-                            value={citySearch}
-                            onChangeText={setCitySearch}
-                            placeholder="🔍 Search cities..."
-                            placeholderTextColor={Colors.textMuted}
-                        />
-                        <View style={styles.chipGroup}>
-                            {filteredCities.map(c => (
-                                <TouchableOpacity
-                                    key={c}
-                                    style={[styles.chip, selectedCity === c && styles.chipSelected]}
-                                    onPress={() => setSelectedCity(c)}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={[styles.chipText, selectedCity === c && styles.chipTextSelected]}>{c}</Text>
-                                </TouchableOpacity>
-                            ))}
-                            {filteredCities.length === 0 && (
-                                <Text style={styles.noCitiesText}>No cities found</Text>
-                            )}
-                        </View>
-                    </>
-                );
-
-            // --- Step 3: Location ---
-            case 3:
-                return (
-                    <>
-                        <Text style={styles.stepEmoji}>📍</Text>
-                        <Text style={styles.stepTitle}>Where are you based?</Text>
+                        <Text style={styles.stepEmoji}>🏠</Text>
+                        <Text style={styles.stepTitle}>Your Addresses</Text>
                         <Text style={styles.stepSubtitle}>So I can plan routes & travel times</Text>
                         <View style={styles.fieldBlock}>
                             <Text style={styles.fieldLabel}>🏠 HOME ADDRESS</Text>
@@ -472,8 +552,8 @@ export default function WelcomeScreen() {
                     </>
                 );
 
-            // --- Step 4: Schedule ---
-            case 4:
+            // --- Step 3: Schedule ---
+            case 3:
                 return (
                     <>
                         <Text style={styles.stepEmoji}>🕐</Text>
@@ -503,8 +583,8 @@ export default function WelcomeScreen() {
                     </>
                 );
 
-            // --- Step 5: Lifestyle ---
-            case 5:
+            // --- Step 4: Lifestyle ---
+            case 4:
                 return (
                     <>
                         <Text style={styles.stepEmoji}>🎯</Text>
@@ -598,8 +678,8 @@ export default function WelcomeScreen() {
                     </>
                 );
 
-            // --- Step 6: Goals & Sleep ---
-            case 6:
+            // --- Step 5: Goals & Sleep ---
+            case 5:
                 return (
                     <>
                         <Text style={styles.stepEmoji}>🚀</Text>
