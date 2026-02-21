@@ -24,6 +24,7 @@ def get_db():
         db.profiles.create_index("user_id", unique=True)
         db.sleep_logs.create_index([("user_id", 1), ("logged_at", -1)])
         db.users.create_index("email", unique=True)
+        db.google_tokens.create_index("user_id", unique=True)
         print(f"[DB] Connected to MongoDB: {DB_NAME}")
     return db
 
@@ -135,3 +136,29 @@ def get_sleep_logs(user_id: str, limit: int = 7) -> list:
         ).sort("logged_at", -1).limit(limit)
     )
     return logs
+
+
+# --- Google OAuth Tokens (per user) ---
+
+def save_google_tokens(user_id: str, tokens: dict) -> None:
+    """Save or update Google OAuth tokens for a user."""
+    database = get_db()
+    doc = {
+        "user_id": user_id,
+        "tokens": tokens,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    database.google_tokens.update_one(
+        {"user_id": user_id},
+        {"$set": doc, "$setOnInsert": {"created_at": datetime.utcnow().isoformat()}},
+        upsert=True,
+    )
+
+
+def get_google_tokens(user_id: str) -> dict | None:
+    """Get Google OAuth tokens for a user, or None if not connected."""
+    database = get_db()
+    row = database.google_tokens.find_one({"user_id": user_id})
+    if not row:
+        return None
+    return row.get("tokens")

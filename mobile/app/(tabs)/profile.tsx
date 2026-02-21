@@ -9,6 +9,7 @@ import {
     ActivityIndicator,
     Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import Colors from '../../constants/Colors';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -35,6 +36,7 @@ const PROFILE_FIELDS: ProfileField[] = [
 ];
 
 export default function ProfileScreen() {
+    const router = useRouter();
     const { user, logout } = useAuth();
     const [formData, setFormData] = useState<Record<string, string>>({});
     const [isLoading, setIsLoading] = useState(false);
@@ -43,12 +45,14 @@ export default function ProfileScreen() {
     const [error, setError] = useState('');
     const [saveStatus, setSaveStatus] = useState('');
     const [serverStatus, setServerStatus] = useState<string | null>(null);
+    const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
 
     // Fetch profile on mount
     useEffect(() => {
         if (user) {
             fetchProfile();
             checkHealth();
+            api.getGoogleStatus(user.user_id).then(({ connected }) => setGoogleConnected(connected)).catch(() => setGoogleConnected(false));
         }
     }, [user]);
 
@@ -154,6 +158,20 @@ export default function ProfileScreen() {
                 <Text style={styles.subtitle}>
                     These preferences help the agent optimize your day plan.
                 </Text>
+            </AnimatedEntry>
+
+            {/* Google connection */}
+            <AnimatedEntry delay={150}>
+                <TouchableOpacity
+                    style={styles.googleCard}
+                    onPress={() => router.push('/connect-google')}
+                    activeOpacity={0.8}
+                >
+                    <Text style={styles.googleCardTitle}>📬 Google (Gmail, Calendar, Tasks)</Text>
+                    <Text style={[styles.googleCardStatus, googleConnected === true && { color: Colors.success }]}>
+                        {googleConnected === null ? '…' : googleConnected ? '✓ Connected' : 'Not connected — tap to connect'}
+                    </Text>
+                </TouchableOpacity>
             </AnimatedEntry>
 
             {isFetching ? (
@@ -353,5 +371,23 @@ const styles = StyleSheet.create({
     refreshButtonText: {
         color: Colors.textSecondary,
         fontSize: 14,
+    },
+    googleCard: {
+        backgroundColor: Colors.surfaceLight,
+        borderRadius: 14,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: Colors.border,
+    },
+    googleCardTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: Colors.text,
+        marginBottom: 4,
+    },
+    googleCardStatus: {
+        fontSize: 13,
+        color: Colors.textSecondary,
     },
 });

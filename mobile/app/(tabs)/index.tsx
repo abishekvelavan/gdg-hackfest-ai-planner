@@ -6,15 +6,16 @@ import {
   TouchableOpacity,
   ScrollView,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
 import Colors from '../../constants/Colors';
-import { api } from '../../services/api';
+import { api, normalizeChatResponse } from '../../services/api';
 import { DayEvent } from '../../types';
 import { EventTile } from '../../components/EventTile';
 import { PlanCard } from '../../components/PlanCard';
 import { AffirmationCard } from '../../components/AffirmationCard';
 import { AnimatedEntry, PulseAnimation } from '../../components/AnimatedScreen';
+import { DayPlanLoader } from '../../components/DayPlanLoader';
+import { useAuth } from '../../contexts/AuthContext';
 
 function parseEventsFromResponse(response: string): DayEvent[] {
   const events: DayEvent[] = [];
@@ -72,7 +73,27 @@ function parseEventsFromResponse(response: string): DayEvent[] {
   return events;
 }
 
+/** Match a line that looks like a time-block: ⏰ 9:00 AM - ... or 9:00 AM - ... */
+const SCHEDULE_LINE = /^(?:⏰\s*)?(?:\*\*)?\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?/;
+
+function getPlanSections(planText: string): { intro: string; scheduleLines: string[] } {
+  const lines = planText.split('\n').map((l) => l.trim()).filter(Boolean);
+  const scheduleLines: string[] = [];
+  let intro = '';
+  let seenFirstSchedule = false;
+  for (const line of lines) {
+    if (SCHEDULE_LINE.test(line)) {
+      seenFirstSchedule = true;
+      scheduleLines.push(line);
+    } else if (!seenFirstSchedule) {
+      intro = intro ? `${intro}\n${line}` : line;
+    }
+  }
+  return { intro, scheduleLines };
+}
+
 export default function DayPlanScreen() {
+  const { user } = useAuth();
   const [events, setEvents] = useState<DayEvent[]>([]);
   const [rawPlan, setRawPlan] = useState('');
   const [weatherSummary, setWeatherSummary] = useState('');
@@ -80,7 +101,6 @@ export default function DayPlanScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [hasFetched, setHasFetched] = useState(false);
-
   const [affirmationVisible, setAffirmationVisible] = useState(true);
 
   const fetchDayPlan = useCallback(async (isPullRefresh = false) => {
@@ -90,19 +110,18 @@ export default function DayPlanScreen() {
     setAffirmationVisible(true);
 
     try {
-      // Ask the agent to plan the day — this goes through the real agent pipeline
       const response = await api.chat(
         'Plan my day. Give me a time-blocked schedule with weather and travel info. Use ⏰ emoji before each time slot and 📍 for locations.',
-        'default_user',
+        user?.user_id ?? 'default_user',
         ''
       );
 
-      setRawPlan(response.response);
-      const parsed = parseEventsFromResponse(response.response);
+      const planText = normalizeChatResponse(response);
+      setRawPlan(planText);
+      const parsed = parseEventsFromResponse(planText);
       setEvents(parsed);
 
-      // Extract weather summary from first line or general weather mention
-      const weatherLine = response.response.split('\n').find(l =>
+      const weatherLine = planText.split('\n').find(l =>
         l.match(/(weather|forecast|temperature|☀️|🌤️|⛅|🌧️|°)/i)
       );
       setWeatherSummary(weatherLine?.replace(/\*\*/g, '').trim() || '');
@@ -113,7 +132,7 @@ export default function DayPlanScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [user?.user_id]);
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -164,14 +183,9 @@ export default function DayPlanScreen() {
         />
       )}
 
-      {/* Loading State */}
+      {/* Loading State — 3D loader */}
       {isLoading && !isRefreshing && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>
-            Agent is planning your day...{'\n'}This may take a moment.
-          </Text>
-        </View>
+        <DayPlanLoader rotatingMessage />
       )}
 
       {/* Error State */}
@@ -191,12 +205,38 @@ export default function DayPlanScreen() {
         </View>
       )}
 
-      {/* Raw plan text as fallback when we couldn't parse events */}
+      {/* Plan as list when we have raw text but no parsed events (e.g. API returned array payload) */}
       {hasFetched && events.length === 0 && rawPlan && !isLoading && (
         <View style={styles.rawPlanContainer}>
           <Text style={styles.sectionTitle}>📋 Your Day Plan</Text>
-          <View style={styles.rawPlanCard}>
-            <Text style={styles.rawPlanText}>{rawPlan}</Text>
+          <View style={styles.planListCard}>
+            {(() => {
+              const { intro, scheduleLines } = getPlanSections(rawPlan);
+              return (
+                <>
+                  {intro ? (
+                    <Text style={styles.planIntro}>{intro}</Text>
+                  ) : null}
+                  {scheduleLines.length > 0 ? (
+                    <View style={styles.planList}>
+                      {scheduleLines.map((line, idx) => {
+                        const timeMatch = line.match(/(?:⏰\s*)?(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)\s*[-–—:]\s*(.+)/);
+                        const time = timeMatch ? timeMatch[1].trim() : '';
+                        const rest = timeMatch ? timeMatch[2].trim() : line;
+                        return (
+                          <View key={`${time}-${idx}`} style={styles.planListItem}>
+                            <Text style={styles.planListTime}>{time || '•'}</Text>
+                            <Text style={styles.planListLabel}>{rest}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <Text style={styles.rawPlanText}>{rawPlan}</Text>
+                  )}
+                </>
+              );
+            })()}
           </View>
         </View>
       )}
@@ -226,17 +266,6 @@ const styles = StyleSheet.create({
   weatherText: {
     color: Colors.text,
     fontSize: 14,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  loadingText: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    marginTop: 16,
-    textAlign: 'center',
-    lineHeight: 20,
   },
   errorContainer: {
     margin: 16,
@@ -282,6 +311,44 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  planListCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  planIntro: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  planList: {
+    gap: 12,
+  },
+  planListItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.primary,
+  },
+  planListTime: {
+    color: Colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
+    width: 72,
+  },
+  planListLabel: {
+    color: Colors.text,
+    fontSize: 14,
+    lineHeight: 20,
+    flex: 1,
   },
   rawPlanText: {
     color: Colors.text,

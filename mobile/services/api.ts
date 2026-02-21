@@ -1,10 +1,26 @@
 import { ChatResponse, SleepResponse, HealthResponse } from '../types';
 
+/**
+ * Normalize chat/plan API response to a single string.
+ * Handles payloads where response is a string or Gemini-style array [{ type: 'text', text: '...' }].
+ */
+export function normalizeChatResponse(payload: any): string {
+    const raw = payload?.response ?? payload;
+    if (typeof raw === 'string') return raw;
+    if (Array.isArray(raw)) {
+        const parts = (raw as { type?: string; text?: string }[])
+            .filter((p) => p?.type === 'text' && p?.text != null)
+            .map((p) => String(p.text));
+        return parts.join('\n').trim() || JSON.stringify(raw);
+    }
+    return String(raw ?? '');
+}
+
 // Change this to your backend URL
-// Local dev: http://10.0.2.2:8000 (Android emulator) or http://localhost:8000 (web)
+// Local dev: http://10.0.2.2:8000 (Android emulator), http://localhost:8000 (Expo web / same machine)
 // ngrok: https://your-ngrok-url.ngrok-free.app
 // Production: https://your-cloud-run-url
-const API_URL = 'http://10.14.220.208:8000';
+const API_URL = 'http://localhost:8000';
 
 const DEFAULT_TIMEOUT = 60000; // 60s — agent responses can be slow
 
@@ -138,4 +154,54 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ email, password }),
         }),
+
+    /**
+     * Get Google OAuth URL for connecting Gmail, Calendar, and Tasks.
+     * GET /api/google/auth?user_id=...
+     */
+    getGoogleAuthUrl: (userId: string): Promise<{ auth_url: string; redirect_uri: string }> =>
+        request<{ auth_url: string; redirect_uri: string }>(
+            `/api/google/auth?user_id=${encodeURIComponent(userId)}`,
+            { method: 'GET' }
+        ),
+
+    /**
+     * Send Google tokens from client-side OAuth (e.g. Expo AuthSession). No credentials.json on server.
+     * POST /api/google/tokens
+     */
+    sendGoogleTokens: (
+        userId: string,
+        accessToken: string,
+        refreshToken?: string,
+        expiry?: string | null
+    ): Promise<{ status: string }> =>
+        request<any>('/api/google/tokens', {
+            method: 'POST',
+            body: JSON.stringify({
+                user_id: userId,
+                access_token: accessToken,
+                refresh_token: refreshToken ?? '',
+                expiry: expiry ?? null,
+            }),
+        }),
+
+    /**
+     * Check if user has connected Google.
+     * GET /api/google/status?user_id=...
+     */
+    getGoogleStatus: (userId: string): Promise<{ connected: boolean }> =>
+        request<{ connected: boolean }>(
+            `/api/google/status?user_id=${encodeURIComponent(userId)}`,
+            { method: 'GET' }
+        ),
+
+    /**
+     * Sync Gmail, Calendar, and Google Tasks (after profile stored and Google connected). Uses LangGraph.
+     * GET /api/google/sync?user_id=...
+     */
+    getGoogleSync: (userId: string): Promise<{ gmail: any; calendar: any; tasks: any }> =>
+        request<any>(
+            `/api/google/sync?user_id=${encodeURIComponent(userId)}`,
+            { method: 'GET' }
+        ),
 };
