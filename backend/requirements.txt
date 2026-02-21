@@ -1,6 +1,9 @@
 google-adk
 google-api-python-client
 google-auth-oauthlib
+langgraph
+langchain-google-genai
+langchain-core
 google-auth-httplib2
 requests
 python-dotenv

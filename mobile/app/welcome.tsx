@@ -470,7 +470,7 @@ export default function WelcomeScreen() {
                 goals: allGoals,
             }, user.user_id);
 
-            router.replace('/(tabs)');
+            router.replace('/connect-google');
         } catch (err: any) {
             setError(err.message || 'Failed to save. Please try again.');
         } finally {

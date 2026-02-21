@@ -1,6 +1,6 @@
 """Day Planner Backend Server.
 
-FastAPI server wrapping the ADK agent system.
+FastAPI server with LangGraph + Gemini agent (no Google ADK).
 Includes APScheduler for morning alarm cron jobs and
 Firebase Cloud Messaging for push notifications.
 """
@@ -12,8 +12,9 @@ from datetime import datetime
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -26,16 +27,11 @@ load_dotenv(Path(__file__).parent / "day_planner" / ".env")
 import firebase_admin
 from firebase_admin import credentials as fb_credentials, messaging
 
-# ADK imports
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
-
-# Import the agent
-from day_planner.agent import root_agent
+# LangGraph + Gemini agent (no ADK)
+from day_planner.agent import run_chat
 
 # MongoDB
-from db import get_db, save_profile, get_profile, close_db, register_user, login_user
+from db import get_db, save_profile, get_profile, close_db, register_user, login_user, save_google_tokens, get_google_tokens
 
 
 # --- Config ---
@@ -51,14 +47,6 @@ firebase_app = None
 if FIREBASE_CONFIG_PATH.exists():
     cred = fb_credentials.Certificate(str(FIREBASE_CONFIG_PATH))
     firebase_app = firebase_admin.initialize_app(cred)
-
-# --- ADK Runner ---
-session_service = InMemorySessionService()
-runner = Runner(
-    agent=root_agent,
-    app_name="day_planner",
-    session_service=session_service,
-)
 
 
 # --- Pydantic Models ---
@@ -116,6 +104,14 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class GoogleTokensFromClientRequest(BaseModel):
+    """Tokens obtained by the app from client-side Google OAuth (e.g. Expo AuthSession)."""
+    user_id: str = "default_user"
+    access_token: str
+    refresh_token: str = ""
+    expiry: str | None = None
+
+
 # --- Lifespan ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -133,18 +129,46 @@ async def lifespan(app: FastAPI):
 # --- FastAPI App ---
 app = FastAPI(
     title="Day Planner API",
-    description="Agentic Day Planner powered by Google ADK + Gemini 3.0 Flash",
+    description="Agentic Day Planner powered by LangGraph + Gemini",
     version="1.0.0",
     lifespan=lifespan,
 )
 
+# Explicit origins so CORS header is sent with allow_credentials=True (wildcard cannot be used with credentials)
+CORS_ORIGINS = [
+    "http://localhost:8081",
+    "http://localhost:3000",
+    "http://127.0.0.1:8081",
+    "http://127.0.0.1:3000",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _cors_headers(origin: str | None) -> dict:
+    """Headers so browser accepts response when request came from a listed origin."""
+    if origin and origin in CORS_ORIGINS:
+        return {"Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true"}
+    return {"Access-Control-Allow-Origin": CORS_ORIGINS[0], "Access-Control-Allow-Credentials": "true"}
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Ensure 500 responses include CORS headers so the client sees the error."""
+    import traceback
+    traceback.print_exc()
+    origin = request.headers.get("origin")
+    headers = _cors_headers(origin)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "type": type(exc).__name__},
+        headers=headers,
+    )
 
 
 # --- Auth Endpoints ---
@@ -211,44 +235,51 @@ def send_push_notification(user_id: str, title: str, body: str, data: dict = Non
         return False
 
 
-async def run_agent(user_id: str, message: str, session_id: str = "") -> tuple[str, str]:
-    """Run the ADK agent with a message and return the response."""
-    if not session_id:
-        session = await session_service.create_session(
-            app_name="day_planner",
-            user_id=user_id,
-        )
-        session_id = session.id
-    else:
-        # Verify session exists, create if not
+def _load_user_context(user_id: str) -> tuple[dict | None, dict | None]:
+    """Load profile from DB and build Google data from stored profile (or fetch live if not stored)."""
+    profile = get_profile(user_id)
+
+    # Prefer Google data stored in profile (from last sync); else fetch live if connected
+    google_data = None
+    if profile and (profile.get("google_gmail") is not None or profile.get("google_calendar") is not None or profile.get("google_tasks") is not None):
+        google_data = {
+            "gmail": profile.get("google_gmail") or {},
+            "calendar": profile.get("google_calendar") or {},
+            "tasks": profile.get("google_tasks") or {},
+        }
+    elif get_google_tokens(user_id):
         try:
-            await session_service.get_session(
-                app_name="day_planner",
-                user_id=user_id,
-                session_id=session_id,
+            from day_planner.google_services import (
+                fetch_gmail_summary,
+                fetch_calendar_events,
+                fetch_google_tasks,
             )
-        except Exception:
-            session = await session_service.create_session(
-                app_name="day_planner",
-                user_id=user_id,
-            )
-            session_id = session.id
+            google_data = {
+                "gmail": fetch_gmail_summary(user_id, max_emails=10),
+                "calendar": fetch_calendar_events(user_id, days_ahead=2),
+                "tasks": fetch_google_tasks(user_id, max_lists=5),
+            }
+        except Exception as e:
+            print(f"[SERVER] Google data fetch failed for {user_id}: {e}")
+            google_data = {}
 
-    content = types.Content(
-        role="user",
-        parts=[types.Part.from_text(message)],
+    return (profile, google_data)
+
+
+async def run_agent(user_id: str, message: str, session_id: str = "") -> tuple[str, str]:
+    """Run the LangGraph + Gemini agent with profile + Google context; returns (response_text, session_id)."""
+    profile, google_data = _load_user_context(user_id)
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,
+        lambda: run_chat(
+            user_id=user_id,
+            message=message,
+            session_id=session_id or "",
+            profile=profile,
+            google_data=google_data,
+        ),
     )
-
-    response_text = ""
-    async for event in runner.run_async(
-        user_id=user_id,
-        session_id=session_id,
-        new_message=content,
-    ):
-        if event.is_final_response() and event.content and event.content.parts:
-            response_text = event.content.parts[0].text or ""
-
-    return response_text, session_id
 
 
 async def trigger_morning_plan(user_id: str):
@@ -384,7 +415,7 @@ async def health_check():
     return {
         "status": "healthy",
         "agent": "day_planner",
-        "model": "gemini-3.0-flash",
+        "model": "langgraph+gemini-2.0-flash",
         "scheduler_running": scheduler.running,
         "firebase_configured": firebase_app is not None,
         "db_connected": get_db() is not None,
@@ -409,6 +440,140 @@ async def get_user_profile(user_id: str):
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     return profile
+
+
+# --- Google OAuth (Gmail, Calendar, Tasks) — no Google ADK ---
+# Redirect URI must match Google Cloud Console (e.g. https://your-api.com/api/google/callback)
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000").rstrip("/")
+GOOGLE_CALLBACK_PATH = "/api/google/callback"
+
+
+@app.get("/api/google/auth")
+async def google_auth_url(user_id: str = Query(..., description="User ID to associate with tokens")):
+    """Return Google OAuth consent URL. Uses GOOGLE_CLIENT_ID from env (no credentials.json required)."""
+    try:
+        from day_planner.google_oauth import build_auth_url
+        redirect_uri = f"{BACKEND_URL}{GOOGLE_CALLBACK_PATH}"
+        auth_url = build_auth_url(user_id, redirect_uri)
+        return {"auth_url": auth_url, "redirect_uri": redirect_uri}
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@app.post("/api/google/tokens")
+async def google_tokens_from_client(request: GoogleTokensFromClientRequest):
+    """
+    Store Google tokens that the app obtained (e.g. from client-side OAuth / Expo AuthSession).
+    No credentials.json needed: set GOOGLE_CLIENT_ID (and optionally GOOGLE_CLIENT_SECRET) in env for refresh.
+    """
+    try:
+        from day_planner.google_oauth import save_tokens_from_client
+        token_dict = save_tokens_from_client(
+            request.user_id,
+            request.access_token,
+            request.refresh_token,
+            request.expiry,
+        )
+        save_google_tokens(request.user_id, token_dict)
+        return {"status": "ok", "message": "Google tokens saved. Gmail, Calendar, and Tasks are connected."}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/google/callback", response_class=HTMLResponse)
+async def google_oauth_callback(
+    code: str = Query(None),
+    state: str = Query(None, description="user_id"),
+    error: str = Query(None),
+):
+    """Exchange code for tokens and store by user_id. Show success or error page."""
+    if error:
+        return _google_callback_html(success=False, message=f"Google denied access: {error}")
+    if not code or not state:
+        return _google_callback_html(success=False, message="Missing code or state (user_id).")
+    try:
+        from day_planner.google_oauth import exchange_code_for_tokens
+        redirect_uri = f"{BACKEND_URL}{GOOGLE_CALLBACK_PATH}"
+        user_id, token_dict = exchange_code_for_tokens(code, redirect_uri, state)
+        save_google_tokens(user_id, token_dict)
+        return _google_callback_html(success=True, message="Gmail, Calendar, and Tasks are now connected.")
+    except Exception as e:
+        return _google_callback_html(success=False, message=str(e))
+
+
+def _google_callback_html(success: bool, message: str) -> HTMLResponse:
+    html = f"""
+    <!DOCTYPE html>
+    <html><head><meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>Google Connect</title></head>
+    <body style="font-family:sans-serif;max-width:360px;margin:40px auto;padding:24px;text-align:center;">
+    <h2>{"✓ Connected" if success else "Connection failed"}</h2>
+    <p>{message}</p>
+    <p style="color:#666;">You can close this window and return to the app.</p>
+    </body></html>
+    """
+    return HTMLResponse(content=html)
+
+
+@app.get("/api/google/status")
+async def google_connection_status(user_id: str = Query(..., description="User ID")):
+    """Check if user has connected their Google account (Gmail, Calendar, Tasks)."""
+    tokens = get_google_tokens(user_id)
+    return {"connected": tokens is not None}
+
+
+@app.get("/api/google/sync")
+async def google_sync(
+    user_id: str = Query(..., description="User ID"),
+):
+    """After profile is stored and Google is connected, fetch Gmail, Calendar, and Google Tasks (LangGraph or direct; no ADK)."""
+    try:
+        tokens = get_google_tokens(user_id)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=200,
+            content={
+                "gmail": {"error": str(e), "emails": []},
+                "calendar": {"error": str(e), "events": []},
+                "tasks": {"error": str(e), "task_lists": []},
+                "sync_error": "Database error",
+            },
+        )
+    if not tokens:
+        raise HTTPException(status_code=400, detail="Google not connected. Complete OAuth first.")
+    result = None
+    try:
+        from day_planner.google_sync_graph import run_google_sync
+        result = run_google_sync(user_id)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        try:
+            from day_planner.google_services import fetch_gmail_summary, fetch_calendar_events, fetch_google_tasks
+            result = {
+                "gmail": fetch_gmail_summary(user_id, max_emails=10),
+                "calendar": fetch_calendar_events(user_id, days_ahead=2),
+                "tasks": fetch_google_tasks(user_id, max_lists=5),
+            }
+        except Exception as e2:
+            traceback.print_exc()
+            result = {
+                "gmail": {"error": str(e2), "emails": []},
+                "calendar": {"error": str(e2), "events": []},
+                "tasks": {"error": str(e2), "task_lists": []},
+                "sync_error": str(e),
+            }
+    # Persist synced data into the profile so the agent can use it for day planning
+    if result and "sync_error" not in result:
+        save_profile(user_id, {
+            "google_gmail": result.get("gmail") or {},
+            "google_calendar": result.get("calendar") or {},
+            "google_tasks": result.get("tasks") or {},
+            "google_synced_at": datetime.utcnow().isoformat(),
+        })
+    return result
 
 
 async def _schedule_alarm_from_response(user_id: str, response: str):

@@ -13,10 +13,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../../constants/Colors';
 import { ChatMessage } from '../../types';
-import { api } from '../../services/api';
+import { api, normalizeChatResponse } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { ChatBubble } from '../../components/ChatBubble';
 import { AnimatedEntry } from '../../components/AnimatedScreen';
+import { DayPlanLoader } from '../../components/DayPlanLoader';
 
 const QUICK_PROMPTS = [
     '📋 Plan my day',
@@ -51,10 +52,12 @@ export default function ChatScreen() {
             const response = await api.chat(text.trim(), user.user_id, sessionId);
             setSessionId(response.session_id);
 
+            const textContent = normalizeChatResponse(response);
+
             const agentMsg: ChatMessage = {
                 id: (Date.now() + 1).toString(),
                 role: 'agent',
-                text: response.response,
+                text: textContent,
                 timestamp: new Date().toISOString(),
             };
 
@@ -131,10 +134,7 @@ export default function ChatScreen() {
 
                 {isLoading && (
                     <View style={styles.typingIndicator}>
-                        <View style={styles.typingDots}>
-                            <ActivityIndicator size="small" color={Colors.primary} />
-                            <Text style={styles.typingText}>Agent is thinking...</Text>
-                        </View>
+                        <DayPlanLoader compact message="Using your profile & calendar..." />
                     </View>
                 )}
 
