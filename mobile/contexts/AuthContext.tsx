@@ -11,16 +11,16 @@ interface User {
 interface AuthContextType {
     user: User | null;
     loading: boolean;
-    login: (email: string, password: string) => Promise<void>;
-    register: (email: string, password: string, name: string) => Promise<void>;
+    login: (email: string, password: string) => Promise<User>;
+    register: (email: string, password: string, name: string) => Promise<User>;
     logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
     user: null,
     loading: true,
-    login: async () => { },
-    register: async () => { },
+    login: async () => ({ user_id: '', email: '', name: '' }),
+    register: async () => ({ user_id: '', email: '', name: '' }),
     logout: async () => { },
 });
 
@@ -44,20 +44,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })();
     }, []);
 
-    const login = async (email: string, password: string) => {
+    const login = async (email: string, password: string): Promise<User> => {
         const res = await api.login(email, password);
         if (res.status === 'error') throw new Error(res.message);
-        const u = res.user;
+        const u = res.user as User;
         setUser(u);
         await AsyncStorage.setItem('user', JSON.stringify(u));
+        return u;
     };
 
-    const register = async (email: string, password: string, name: string) => {
+    const register = async (email: string, password: string, name: string): Promise<User> => {
         const res = await api.register(email, password, name);
         if (res.status === 'error') throw new Error(res.message);
-        const u = res.user;
+        const u = res.user as User;
         setUser(u);
         await AsyncStorage.setItem('user', JSON.stringify(u));
+        return u;
     };
 
     const logout = async () => {

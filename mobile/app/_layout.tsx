@@ -1,11 +1,12 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
-import { AuthProvider } from '../contexts/AuthContext';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -26,6 +27,25 @@ const CustomDarkTheme = {
     primary: '#6C63FF',
   },
 };
+
+function AuthRedirect() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+    // User is already logged in (app restarted) — check if they have a profile
+    api.getProfile(user.user_id)
+      .then(() => router.replace('/(tabs)'))
+      .catch(() => router.replace('/welcome'));
+  }, [user, loading]);
+
+  return null;
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -48,6 +68,7 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <ThemeProvider value={CustomDarkTheme}>
+        <AuthRedirect />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="login" />
           <Stack.Screen name="welcome" />

@@ -59,12 +59,18 @@ export default function LoginScreen() {
 
         setLoading(true);
         try {
-            if (isSignup) {
-                await register(email, password, name);
-            } else {
-                await login(email, password);
+            const u = isSignup
+                ? await register(email, password, name)
+                : await login(email, password);
+
+            // If the user already has a saved profile, skip onboarding
+            try {
+                await api.getProfile(u.user_id);
+                router.replace('/(tabs)');
+            } catch {
+                // No profile yet — go through onboarding
+                router.replace('/welcome');
             }
-            router.replace('/welcome');
         } catch (err: any) {
             setError(err.message || 'Something went wrong');
         } finally {
