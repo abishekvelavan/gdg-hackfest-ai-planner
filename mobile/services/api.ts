@@ -4,7 +4,7 @@ import { ChatResponse, SleepResponse, HealthResponse } from '../types';
 // Local dev: http://10.0.2.2:8000 (Android emulator) or http://localhost:8000 (web)
 // ngrok: https://your-ngrok-url.ngrok-free.app
 // Production: https://your-cloud-run-url
-const API_URL = 'http://10.50.73.36:8000';
+const API_URL = 'http://10.14.220.208:8000';
 
 const DEFAULT_TIMEOUT = 60000; // 60s — agent responses can be slow
 

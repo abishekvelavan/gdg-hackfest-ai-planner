@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     View,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 const Colors = {
     bg: '#0F0F1A',
@@ -29,7 +30,7 @@ const Colors = {
 
 export default function LoginScreen() {
     const router = useRouter();
-    const { login, register } = useAuth();
+    const { user, loading: authLoading, login, register } = useAuth();
 
     const [isSignup, setIsSignup] = useState(false);
     const [name, setName] = useState('');
@@ -38,6 +39,29 @@ export default function LoginScreen() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // Handle initial app load / auto-login
+    useEffect(() => {
+        let mounted = true;
+        const checkExistingSession = async () => {
+            if (!authLoading && user) {
+                try {
+                    const profile = await api.getProfile(user.user_id);
+                    if (mounted) {
+                        if (profile && profile.name) {
+                            router.replace('/(tabs)');
+                        } else {
+                            router.replace('/welcome');
+                        }
+                    }
+                } catch (e) {
+                    if (mounted) router.replace('/welcome');
+                }
+            }
+        };
+        checkExistingSession();
+        return () => { mounted = false; };
+    }, [user, authLoading]);
 
     const handleSubmit = async () => {
         setError('');
@@ -59,24 +83,27 @@ export default function LoginScreen() {
 
         setLoading(true);
         try {
-            const u = isSignup
-                ? await register(email, password, name)
-                : await login(email, password);
-
-            // If the user already has a saved profile, skip onboarding
-            try {
-                await api.getProfile(u.user_id);
-                router.replace('/(tabs)');
-            } catch {
-                // No profile yet — go through onboarding
+            if (isSignup) {
+                await register(email, password, name);
+                // Newly registered users always go to onboarding
                 router.replace('/welcome');
+            } else {
+                await login(email, password);
+                // The useEffect will automatically pick up the new user state and route accordingly
             }
         } catch (err: any) {
             setError(err.message || 'Something went wrong');
-        } finally {
-            setLoading(false);
+            setLoading(false); // Only stop loading if there is an error, otherwise let the redirect happen
         }
     };
+
+    if (authLoading) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+        );
+    }
 
     return (
         <KeyboardAvoidingView
