@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 
+
 export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {

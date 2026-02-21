@@ -11,29 +11,9 @@ import {
 import Colors from '../../constants/Colors';
 import { api } from '../../services/api';
 import { DayEvent } from '../../types';
-
-const CATEGORY_COLORS: Record<string, string> = {
-  work: Colors.work,
-  health: Colors.health,
-  errand: Colors.errand,
-  break: Colors.break,
-  focus: Colors.focus,
-};
-
-const CATEGORY_ICONS: Record<string, string> = {
-  work: '💼',
-  health: '🏃',
-  errand: '🛒',
-  break: '☕',
-  focus: '🎯',
-};
-
-const TRAVEL_ICONS: Record<string, string> = {
-  car: '🚗',
-  bike: '🚲',
-  walk: '🚶',
-  transit: '🚌',
-};
+import { EventTile } from '../../components/EventTile';
+import { PlanCard } from '../../components/PlanCard';
+import { AffirmationCard } from '../../components/AffirmationCard';
 
 function parseEventsFromResponse(response: string): DayEvent[] {
   const events: DayEvent[] = [];
@@ -91,36 +71,6 @@ function parseEventsFromResponse(response: string): DayEvent[] {
   return events;
 }
 
-function EventCard({ event }: { event: DayEvent }) {
-  const categoryColor = CATEGORY_COLORS[event.category] || Colors.work;
-  const categoryIcon = CATEGORY_ICONS[event.category] || '📌';
-
-  return (
-    <View style={[styles.eventCard, { borderLeftColor: categoryColor }]}>
-      <View style={styles.eventHeader}>
-        <View style={[styles.timeBadge, { backgroundColor: categoryColor + '20' }]}>
-          <Text style={[styles.timeText, { color: categoryColor }]}>{event.time}</Text>
-        </View>
-        {event.weather && <Text style={styles.weatherBadge}>{event.weather}</Text>}
-      </View>
-      <View style={styles.eventBody}>
-        <Text style={styles.eventIcon}>{categoryIcon}</Text>
-        <View style={styles.eventDetails}>
-          <Text style={styles.eventTitle}>{event.title}</Text>
-          {event.location && (
-            <Text style={styles.eventLocation}>📍 {event.location}</Text>
-          )}
-          {event.travelMode && (
-            <Text style={styles.eventTravel}>
-              {TRAVEL_ICONS[event.travelMode] || '🚗'} {event.travelTime || event.travelMode}
-            </Text>
-          )}
-        </View>
-      </View>
-    </View>
-  );
-}
-
 export default function DayPlanScreen() {
   const [events, setEvents] = useState<DayEvent[]>([]);
   const [rawPlan, setRawPlan] = useState('');
@@ -130,10 +80,13 @@ export default function DayPlanScreen() {
   const [error, setError] = useState('');
   const [hasFetched, setHasFetched] = useState(false);
 
+  const [affirmationVisible, setAffirmationVisible] = useState(true);
+
   const fetchDayPlan = useCallback(async (isPullRefresh = false) => {
     if (isPullRefresh) setIsRefreshing(true);
     else setIsLoading(true);
     setError('');
+    setAffirmationVisible(true);
 
     try {
       // Ask the agent to plan the day — this goes through the real agent pipeline
@@ -192,12 +145,13 @@ export default function DayPlanScreen() {
         />
       }
     >
-      {/* Weather Header */}
-      {weatherSummary ? (
-        <View style={styles.weatherBar}>
-          <Text style={styles.weatherText}>{weatherSummary}</Text>
-        </View>
-      ) : null}
+      {/* Morning Affirmation */}
+      {events.length > 0 && affirmationVisible && (
+        <AffirmationCard
+          text="Good morning! Here is your personalized plan to make today great."
+          onDismiss={() => setAffirmationVisible(false)}
+        />
+      )}
 
       {/* Loading State */}
       {isLoading && !isRefreshing && (
@@ -219,15 +173,10 @@ export default function DayPlanScreen() {
         </View>
       ) : null}
 
-      {/* Events */}
+      {/* Events via PlanCard */}
       {events.length > 0 && (
         <View style={styles.eventsContainer}>
-          <Text style={styles.sectionTitle}>
-            📅 Today's Plan · {events.length} events
-          </Text>
-          {events.map((event, idx) => (
-            <EventCard key={`${event.time}-${idx}`} event={event} />
-          ))}
+          <PlanCard plan={{ date: new Date().toISOString().split('T')[0], events, weather_summary: weatherSummary }} />
         </View>
       )}
 
@@ -312,61 +261,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.text,
     marginBottom: 16,
-  },
-  eventCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    borderLeftWidth: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  eventHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  timeBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  timeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  weatherBadge: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  eventBody: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  eventIcon: {
-    fontSize: 20,
-    marginRight: 10,
-    marginTop: 2,
-  },
-  eventDetails: {
-    flex: 1,
-  },
-  eventTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  eventLocation: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 2,
-  },
-  eventTravel: {
-    fontSize: 12,
-    color: Colors.accent,
   },
   rawPlanContainer: {
     padding: 16,

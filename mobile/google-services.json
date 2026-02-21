@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "398096332339",
+    "project_id": "gdghacks-647df",
+    "storage_bucket": "gdghacks-647df.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:398096332339:android:e2853decd1fc80211d9546",
+        "android_client_info": {
+          "package_name": "com.gdghack.gdgchennai"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "398096332339-ncqfvodp70lkn1jr2llvuhml652uha5b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAv75-XYJkYjDLA-J1h8_zjvPqZ9XU3aTM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "398096332339-ncqfvodp70lkn1jr2llvuhml652uha5b.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
