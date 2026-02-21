@@ -7,87 +7,214 @@ import {
     TouchableOpacity,
     ScrollView,
     ActivityIndicator,
-    Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Colors from '../constants/Colors';
 import { api } from '../services/api';
 
-const { width } = Dimensions.get('window');
+// --- Selectable Chip Component ---
+function Chip({
+    label,
+    selected,
+    onPress,
+    emoji,
+}: {
+    label: string;
+    selected: boolean;
+    onPress: () => void;
+    emoji?: string;
+}) {
+    return (
+        <TouchableOpacity
+            style={[styles.chip, selected && styles.chipSelected]}
+            onPress={onPress}
+            activeOpacity={0.7}
+        >
+            {emoji && <Text style={styles.chipEmoji}>{emoji}</Text>}
+            <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+        </TouchableOpacity>
+    );
+}
 
-const STEPS = [
-    {
-        key: 'name',
-        emoji: '👋',
-        title: 'What should I call you?',
-        subtitle: 'Let\'s start with your name',
-        placeholder: 'Your name',
-        field: 'Name',
-    },
-    {
-        key: 'location',
-        emoji: '📍',
-        title: 'Where are you based?',
-        subtitle: 'Your home and work/school addresses',
-        fields: [
-            { key: 'home_address', placeholder: 'Home address', label: 'Home Address' },
-            { key: 'office_address', placeholder: 'Work/school address', label: 'Office Address' },
-        ],
-    },
-    {
-        key: 'timings',
-        emoji: '🕐',
-        title: 'Your schedule',
-        subtitle: 'When do you work or study?',
-        fields: [
-            { key: 'work_hours', placeholder: 'e.g. 9 AM - 5 PM', label: 'Work Hours' },
-            { key: 'energy_type', placeholder: 'Morning person or night owl?', label: 'Energy Type' },
-            { key: 'peak_focus_hours', placeholder: 'e.g. 9 AM - 12 PM', label: 'Peak Focus Hours' },
-        ],
-    },
-    {
-        key: 'hobbies',
-        emoji: '🎯',
-        title: 'Hobbies & preferences',
-        subtitle: 'What do you enjoy? How do you commute?',
-        fields: [
-            { key: 'hobbies', placeholder: 'Reading, gaming, cooking...', label: 'Hobbies' },
-            { key: 'transport', placeholder: 'Car, bike, walk, transit', label: 'Transport' },
-            { key: 'exercise_preferences', placeholder: 'e.g. gym at 6 PM', label: 'Exercise' },
-        ],
-    },
-    {
-        key: 'goals',
-        emoji: '🚀',
-        title: 'Your goals',
-        subtitle: 'What do you want to achieve? How much sleep do you need?',
-        fields: [
-            { key: 'goals', placeholder: 'What are your goals for the day planner?', label: 'Goals', multiline: true },
-            { key: 'sleep_target', placeholder: '7.5', label: 'Sleep target (hours)' },
-        ],
-    },
+// --- Multi-Select Chip Group ---
+function ChipGroup({
+    options,
+    selected,
+    onToggle,
+    multi = false,
+}: {
+    options: { label: string; value: string; emoji?: string }[];
+    selected: string[];
+    onToggle: (value: string) => void;
+    multi?: boolean;
+}) {
+    return (
+        <View style={styles.chipGroup}>
+            {options.map((opt) => (
+                <Chip
+                    key={opt.value}
+                    label={opt.label}
+                    emoji={opt.emoji}
+                    selected={selected.includes(opt.value)}
+                    onPress={() => onToggle(opt.value)}
+                />
+            ))}
+        </View>
+    );
+}
+
+// --- Stepper Control ---
+function Stepper({
+    value,
+    min,
+    max,
+    step,
+    unit,
+    onValueChange,
+}: {
+    value: number;
+    min: number;
+    max: number;
+    step: number;
+    unit: string;
+    onValueChange: (v: number) => void;
+}) {
+    return (
+        <View style={styles.stepperContainer}>
+            <TouchableOpacity
+                style={[styles.stepperButton, value <= min && styles.stepperButtonDisabled]}
+                onPress={() => value > min && onValueChange(parseFloat((value - step).toFixed(1)))}
+                disabled={value <= min}
+            >
+                <Text style={styles.stepperButtonText}>−</Text>
+            </TouchableOpacity>
+            <View style={styles.stepperValue}>
+                <Text style={styles.stepperValueText}>{value}</Text>
+                <Text style={styles.stepperUnitText}>{unit}</Text>
+            </View>
+            <TouchableOpacity
+                style={[styles.stepperButton, value >= max && styles.stepperButtonDisabled]}
+                onPress={() => value < max && onValueChange(parseFloat((value + step).toFixed(1)))}
+                disabled={value >= max}
+            >
+                <Text style={styles.stepperButtonText}>+</Text>
+            </TouchableOpacity>
+        </View>
+    );
+}
+
+// --- Time Picker Chips ---
+const WORK_HOUR_OPTIONS = [
+    { label: '9 AM – 5 PM', value: '9 AM - 5 PM', emoji: '🏢' },
+    { label: '10 AM – 6 PM', value: '10 AM - 6 PM', emoji: '🏢' },
+    { label: '8 AM – 4 PM', value: '8 AM - 4 PM', emoji: '🌅' },
+    { label: 'Flexible', value: 'Flexible', emoji: '🔄' },
+    { label: 'Night shift', value: 'Night shift', emoji: '🌙' },
+    { label: 'Student', value: 'Student hours', emoji: '📚' },
+];
+
+const ENERGY_OPTIONS = [
+    { label: 'Morning Person', value: 'morning person', emoji: '🌅' },
+    { label: 'Night Owl', value: 'night owl', emoji: '🦉' },
+    { label: 'Flexible', value: 'flexible', emoji: '⚡' },
+];
+
+const FOCUS_OPTIONS = [
+    { label: '6–9 AM', value: '6 AM - 9 AM', emoji: '🌄' },
+    { label: '9 AM–12 PM', value: '9 AM - 12 PM', emoji: '☀️' },
+    { label: '12–3 PM', value: '12 PM - 3 PM', emoji: '🌤️' },
+    { label: '3–6 PM', value: '3 PM - 6 PM', emoji: '🌆' },
+    { label: '6–9 PM', value: '6 PM - 9 PM', emoji: '🌙' },
+    { label: '9 PM–12 AM', value: '9 PM - 12 AM', emoji: '🦉' },
+];
+
+const TRANSPORT_OPTIONS = [
+    { label: 'Car', value: 'car', emoji: '🚗' },
+    { label: 'Bike', value: 'bike', emoji: '🚲' },
+    { label: 'Walk', value: 'walk', emoji: '🚶' },
+    { label: 'Transit', value: 'transit', emoji: '🚌' },
+    { label: 'Train', value: 'train', emoji: '🚆' },
+    { label: 'Scooter', value: 'scooter', emoji: '🛵' },
+];
+
+const EXERCISE_OPTIONS = [
+    { label: 'Gym', value: 'gym', emoji: '🏋️' },
+    { label: 'Running', value: 'running', emoji: '🏃' },
+    { label: 'Yoga', value: 'yoga', emoji: '🧘' },
+    { label: 'Swimming', value: 'swimming', emoji: '🏊' },
+    { label: 'Cycling', value: 'cycling', emoji: '🚴' },
+    { label: 'Sports', value: 'sports', emoji: '⚽' },
+    { label: 'Walking', value: 'walking', emoji: '🚶' },
+    { label: 'None', value: 'none', emoji: '🛋️' },
+];
+
+const EXERCISE_TIME_OPTIONS = [
+    { label: 'Morning', value: 'morning', emoji: '🌅' },
+    { label: 'Afternoon', value: 'afternoon', emoji: '☀️' },
+    { label: 'Evening', value: 'evening', emoji: '🌆' },
+];
+
+const HOBBY_OPTIONS = [
+    { label: 'Reading', value: 'reading', emoji: '📚' },
+    { label: 'Gaming', value: 'gaming', emoji: '🎮' },
+    { label: 'Cooking', value: 'cooking', emoji: '👨‍🍳' },
+    { label: 'Music', value: 'music', emoji: '🎵' },
+    { label: 'Art', value: 'art', emoji: '🎨' },
+    { label: 'Movies', value: 'movies', emoji: '🎬' },
+    { label: 'Travel', value: 'travel', emoji: '✈️' },
+    { label: 'Photography', value: 'photography', emoji: '📸' },
+    { label: 'Gardening', value: 'gardening', emoji: '🌱' },
+    { label: 'Writing', value: 'writing', emoji: '✍️' },
+    { label: 'Social', value: 'social', emoji: '👥' },
+    { label: 'Coding', value: 'coding', emoji: '💻' },
+];
+
+const GOAL_OPTIONS = [
+    { label: 'Be more productive', value: 'productivity', emoji: '📈' },
+    { label: 'Better work-life balance', value: 'work-life balance', emoji: '⚖️' },
+    { label: 'Exercise regularly', value: 'regular exercise', emoji: '💪' },
+    { label: 'Sleep better', value: 'better sleep', emoji: '😴' },
+    { label: 'Learn new things', value: 'learning', emoji: '🧠' },
+    { label: 'Reduce stress', value: 'reduce stress', emoji: '🧘' },
+    { label: 'Stay organized', value: 'stay organized', emoji: '📋' },
+    { label: 'More free time', value: 'more free time', emoji: '🕐' },
 ];
 
 export default function WelcomeScreen() {
     const router = useRouter();
     const [currentStep, setCurrentStep] = useState(0);
-    const [formData, setFormData] = useState<Record<string, string>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
 
-    const step = STEPS[currentStep];
-    const isLastStep = currentStep === STEPS.length - 1;
+    // Form data
+    const [name, setName] = useState('');
+    const [homeAddress, setHomeAddress] = useState('');
+    const [officeAddress, setOfficeAddress] = useState('');
+    const [workHours, setWorkHours] = useState('');
+    const [energyType, setEnergyType] = useState('');
+    const [focusHours, setFocusHours] = useState('');
+    const [transports, setTransports] = useState<string[]>([]);
+    const [exercises, setExercises] = useState<string[]>([]);
+    const [exerciseTime, setExerciseTime] = useState('');
+    const [hobbies, setHobbies] = useState<string[]>([]);
+    const [goals, setGoals] = useState<string[]>([]);
+    const [sleepTarget, setSleepTarget] = useState(7.5);
+
+    const TOTAL_STEPS = 5;
+    const isLastStep = currentStep === TOTAL_STEPS - 1;
     const isFirstStep = currentStep === 0;
 
-    const updateField = (key: string, value: string) => {
-        setFormData(prev => ({ ...prev, [key]: value }));
+    const toggleInArray = (arr: string[], value: string, setter: (v: string[]) => void) => {
+        setter(arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]);
+    };
+
+    const selectSingle = (value: string, setter: (v: string) => void) => {
+        setter(value);
     };
 
     const canProceed = () => {
-        if (step.key === 'name') {
-            return (formData['name'] || '').trim().length > 0;
-        }
-        return true; // other steps are optional
+        if (currentStep === 0) return name.trim().length > 0;
+        return true;
     };
 
     const handleNext = async () => {
@@ -99,9 +226,7 @@ export default function WelcomeScreen() {
     };
 
     const handleBack = () => {
-        if (!isFirstStep) {
-            setCurrentStep(prev => prev - 1);
-        }
+        if (!isFirstStep) setCurrentStep(prev => prev - 1);
     };
 
     const saveProfile = async () => {
@@ -109,24 +234,22 @@ export default function WelcomeScreen() {
         setError('');
 
         try {
-            // Build a natural profile message for the agent
             const parts: string[] = [];
-            if (formData.name) parts.push(`Name: ${formData.name}`);
-            if (formData.home_address) parts.push(`Home Address: ${formData.home_address}`);
-            if (formData.office_address) parts.push(`Office Address: ${formData.office_address}`);
-            if (formData.work_hours) parts.push(`Work Hours: ${formData.work_hours}`);
-            if (formData.energy_type) parts.push(`Energy Type: ${formData.energy_type}`);
-            if (formData.peak_focus_hours) parts.push(`Peak Focus Hours: ${formData.peak_focus_hours}`);
-            if (formData.transport) parts.push(`Transport: ${formData.transport}`);
-            if (formData.exercise_preferences) parts.push(`Exercise Preferences: ${formData.exercise_preferences}`);
-            if (formData.sleep_target) parts.push(`Sleep Target: ${formData.sleep_target} hours`);
-            if (formData.hobbies) parts.push(`Hobbies: ${formData.hobbies}`);
-            if (formData.goals) parts.push(`Goals: ${formData.goals}`);
+            if (name) parts.push(`Name: ${name}`);
+            if (homeAddress) parts.push(`Home Address: ${homeAddress}`);
+            if (officeAddress) parts.push(`Office Address: ${officeAddress}`);
+            if (workHours) parts.push(`Work Hours: ${workHours}`);
+            if (energyType) parts.push(`Energy Type: ${energyType}`);
+            if (focusHours) parts.push(`Peak Focus Hours: ${focusHours}`);
+            if (transports.length) parts.push(`Transport: ${transports.join(', ')}`);
+            if (exercises.length) parts.push(`Exercise: ${exercises.join(', ')}${exerciseTime ? ` (${exerciseTime})` : ''}`);
+            parts.push(`Sleep Target: ${sleepTarget} hours`);
+            if (hobbies.length) parts.push(`Hobbies: ${hobbies.join(', ')}`);
+            if (goals.length) parts.push(`Goals: ${goals.join(', ')}`);
 
             const message = `Save my profile with these details:\n${parts.join('\n')}`;
             await api.chat(message);
 
-            // Navigate to main app
             router.replace('/(tabs)');
         } catch (err: any) {
             setError(err.message || 'Failed to save. Please try again.');
@@ -135,17 +258,174 @@ export default function WelcomeScreen() {
         }
     };
 
+    const renderStep = () => {
+        switch (currentStep) {
+            // --- Step 0: Name ---
+            case 0:
+                return (
+                    <>
+                        <Text style={styles.stepEmoji}>👋</Text>
+                        <Text style={styles.stepTitle}>Welcome!</Text>
+                        <Text style={styles.stepSubtitle}>What should I call you?</Text>
+                        <TextInput
+                            style={styles.nameInput}
+                            value={name}
+                            onChangeText={setName}
+                            placeholder="Your name"
+                            placeholderTextColor={Colors.textMuted}
+                            autoFocus
+                            autoCapitalize="words"
+                        />
+                    </>
+                );
+
+            // --- Step 1: Location ---
+            case 1:
+                return (
+                    <>
+                        <Text style={styles.stepEmoji}>📍</Text>
+                        <Text style={styles.stepTitle}>Where are you based?</Text>
+                        <Text style={styles.stepSubtitle}>So I can plan routes & travel times</Text>
+                        <View style={styles.fieldBlock}>
+                            <Text style={styles.fieldLabel}>🏠 HOME ADDRESS</Text>
+                            <TextInput
+                                style={styles.fieldInput}
+                                value={homeAddress}
+                                onChangeText={setHomeAddress}
+                                placeholder="Your home address"
+                                placeholderTextColor={Colors.textMuted}
+                            />
+                        </View>
+                        <View style={styles.fieldBlock}>
+                            <Text style={styles.fieldLabel}>🏢 WORK / SCHOOL</Text>
+                            <TextInput
+                                style={styles.fieldInput}
+                                value={officeAddress}
+                                onChangeText={setOfficeAddress}
+                                placeholder="Work or school address"
+                                placeholderTextColor={Colors.textMuted}
+                            />
+                        </View>
+                    </>
+                );
+
+            // --- Step 2: Schedule ---
+            case 2:
+                return (
+                    <>
+                        <Text style={styles.stepEmoji}>🕐</Text>
+                        <Text style={styles.stepTitle}>Your schedule</Text>
+                        <Text style={styles.stepSubtitle}>Pick what fits you best</Text>
+
+                        <Text style={styles.sectionLabel}>Work / School Hours</Text>
+                        <ChipGroup
+                            options={WORK_HOUR_OPTIONS}
+                            selected={workHours ? [workHours] : []}
+                            onToggle={(v) => selectSingle(v, setWorkHours)}
+                        />
+
+                        <Text style={styles.sectionLabel}>Energy Type</Text>
+                        <ChipGroup
+                            options={ENERGY_OPTIONS}
+                            selected={energyType ? [energyType] : []}
+                            onToggle={(v) => selectSingle(v, setEnergyType)}
+                        />
+
+                        <Text style={styles.sectionLabel}>Peak Focus Hours</Text>
+                        <ChipGroup
+                            options={FOCUS_OPTIONS}
+                            selected={focusHours ? [focusHours] : []}
+                            onToggle={(v) => selectSingle(v, setFocusHours)}
+                        />
+                    </>
+                );
+
+            // --- Step 3: Lifestyle ---
+            case 3:
+                return (
+                    <>
+                        <Text style={styles.stepEmoji}>🎯</Text>
+                        <Text style={styles.stepTitle}>Your lifestyle</Text>
+                        <Text style={styles.stepSubtitle}>Select all that apply</Text>
+
+                        <Text style={styles.sectionLabel}>How do you commute?</Text>
+                        <ChipGroup
+                            options={TRANSPORT_OPTIONS}
+                            selected={transports}
+                            onToggle={(v) => toggleInArray(transports, v, setTransports)}
+                            multi
+                        />
+
+                        <Text style={styles.sectionLabel}>Exercise</Text>
+                        <ChipGroup
+                            options={EXERCISE_OPTIONS}
+                            selected={exercises}
+                            onToggle={(v) => toggleInArray(exercises, v, setExercises)}
+                            multi
+                        />
+
+                        {exercises.length > 0 && !exercises.includes('none') && (
+                            <>
+                                <Text style={styles.sectionLabel}>Preferred Exercise Time</Text>
+                                <ChipGroup
+                                    options={EXERCISE_TIME_OPTIONS}
+                                    selected={exerciseTime ? [exerciseTime] : []}
+                                    onToggle={(v) => selectSingle(v, setExerciseTime)}
+                                />
+                            </>
+                        )}
+
+                        <Text style={styles.sectionLabel}>Hobbies</Text>
+                        <ChipGroup
+                            options={HOBBY_OPTIONS}
+                            selected={hobbies}
+                            onToggle={(v) => toggleInArray(hobbies, v, setHobbies)}
+                            multi
+                        />
+                    </>
+                );
+
+            // --- Step 4: Goals & Sleep ---
+            case 4:
+                return (
+                    <>
+                        <Text style={styles.stepEmoji}>🚀</Text>
+                        <Text style={styles.stepTitle}>Goals & Sleep</Text>
+                        <Text style={styles.stepSubtitle}>What matters most to you?</Text>
+
+                        <Text style={styles.sectionLabel}>Your Goals</Text>
+                        <ChipGroup
+                            options={GOAL_OPTIONS}
+                            selected={goals}
+                            onToggle={(v) => toggleInArray(goals, v, setGoals)}
+                            multi
+                        />
+
+                        <Text style={styles.sectionLabel}>Sleep Target</Text>
+                        <Stepper
+                            value={sleepTarget}
+                            min={4}
+                            max={12}
+                            step={0.5}
+                            unit="hours"
+                            onValueChange={setSleepTarget}
+                        />
+                    </>
+                );
+
+            default:
+                return null;
+        }
+    };
+
     return (
         <View style={styles.container}>
             {/* Progress Bar */}
             <View style={styles.progressContainer}>
-                {STEPS.map((_, idx) => (
+                {[...Array(TOTAL_STEPS)].map((_, idx) => (
                     <View
                         key={idx}
-                        style={[
-                            styles.progressDot,
-                            idx <= currentStep && styles.progressDotActive,
-                        ]}
+                        style={[styles.progressDot, idx <= currentStep && styles.progressDotActive]}
                     />
                 ))}
             </View>
@@ -154,43 +434,10 @@ export default function WelcomeScreen() {
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
             >
-                {/* Step Header */}
-                <Text style={styles.stepEmoji}>{step.emoji}</Text>
-                <Text style={styles.stepTitle}>{step.title}</Text>
-                <Text style={styles.stepSubtitle}>{step.subtitle}</Text>
+                {renderStep()}
 
-                {/* Single field step (name) */}
-                {step.key === 'name' && (
-                    <View style={styles.fieldContainer}>
-                        <TextInput
-                            style={styles.fieldInputLarge}
-                            value={formData['name'] || ''}
-                            onChangeText={(v) => updateField('name', v)}
-                            placeholder={step.placeholder}
-                            placeholderTextColor={Colors.textMuted}
-                            autoFocus
-                            autoCapitalize="words"
-                        />
-                    </View>
-                )}
-
-                {/* Multi-field steps */}
-                {'fields' in step && step.fields && step.fields.map((field: any) => (
-                    <View key={field.key} style={styles.fieldContainer}>
-                        <Text style={styles.fieldLabel}>{field.label}</Text>
-                        <TextInput
-                            style={[styles.fieldInput, field.multiline && styles.fieldInputMultiline]}
-                            value={formData[field.key] || ''}
-                            onChangeText={(v) => updateField(field.key, v)}
-                            placeholder={field.placeholder}
-                            placeholderTextColor={Colors.textMuted}
-                            multiline={field.multiline}
-                        />
-                    </View>
-                ))}
-
-                {/* Error */}
                 {error ? (
                     <View style={styles.errorCard}>
                         <Text style={styles.errorText}>⚠️ {error}</Text>
@@ -227,7 +474,6 @@ export default function WelcomeScreen() {
                 </TouchableOpacity>
             </View>
 
-            {/* Skip Link */}
             {!isLastStep && (
                 <TouchableOpacity
                     style={styles.skipButton}
@@ -244,14 +490,14 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.background,
-        paddingTop: 60,
+        paddingTop: 56,
     },
     progressContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
         gap: 8,
         paddingHorizontal: 40,
-        marginBottom: 20,
+        marginBottom: 12,
     },
     progressDot: {
         flex: 1,
@@ -266,38 +512,48 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingHorizontal: 28,
-        paddingTop: 20,
+        paddingHorizontal: 24,
+        paddingTop: 12,
         paddingBottom: 20,
     },
     stepEmoji: {
-        fontSize: 56,
+        fontSize: 52,
         textAlign: 'center',
-        marginBottom: 16,
+        marginBottom: 12,
     },
     stepTitle: {
         fontSize: 28,
         fontWeight: '800',
         color: Colors.text,
         textAlign: 'center',
-        marginBottom: 8,
+        marginBottom: 6,
     },
     stepSubtitle: {
         fontSize: 15,
         color: Colors.textSecondary,
         textAlign: 'center',
         lineHeight: 22,
-        marginBottom: 32,
+        marginBottom: 28,
     },
-    fieldContainer: {
+    nameInput: {
+        backgroundColor: Colors.surfaceLight,
+        borderRadius: 16,
+        paddingHorizontal: 20,
+        paddingVertical: 18,
+        fontSize: 22,
+        color: Colors.text,
+        borderWidth: 1.5,
+        borderColor: Colors.primary + '60',
+        textAlign: 'center',
+    },
+    fieldBlock: {
         marginBottom: 18,
     },
     fieldLabel: {
-        fontSize: 13,
-        fontWeight: '600',
+        fontSize: 12,
+        fontWeight: '700',
         color: Colors.textSecondary,
         marginBottom: 6,
-        textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
     fieldInput: {
@@ -310,20 +566,85 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.border,
     },
-    fieldInputLarge: {
-        backgroundColor: Colors.surfaceLight,
-        borderRadius: 16,
-        paddingHorizontal: 20,
-        paddingVertical: 18,
-        fontSize: 22,
-        color: Colors.text,
-        borderWidth: 1.5,
-        borderColor: Colors.primary + '60',
-        textAlign: 'center',
+    sectionLabel: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: Colors.textSecondary,
+        marginTop: 20,
+        marginBottom: 10,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
-    fieldInputMultiline: {
-        minHeight: 90,
-        textAlignVertical: 'top',
+    chipGroup: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    chip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.surfaceLight,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 20,
+        borderWidth: 1.5,
+        borderColor: Colors.border,
+    },
+    chipSelected: {
+        backgroundColor: Colors.primary + '25',
+        borderColor: Colors.primary,
+    },
+    chipEmoji: {
+        fontSize: 14,
+        marginRight: 6,
+    },
+    chipText: {
+        fontSize: 14,
+        color: Colors.textSecondary,
+        fontWeight: '500',
+    },
+    chipTextSelected: {
+        color: Colors.primaryLight,
+        fontWeight: '700',
+    },
+    stepperContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 8,
+        gap: 16,
+    },
+    stepperButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: Colors.surfaceLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: Colors.border,
+    },
+    stepperButtonDisabled: {
+        opacity: 0.3,
+    },
+    stepperButtonText: {
+        fontSize: 24,
+        color: Colors.text,
+        fontWeight: '600',
+    },
+    stepperValue: {
+        alignItems: 'center',
+        minWidth: 80,
+    },
+    stepperValueText: {
+        fontSize: 42,
+        fontWeight: '800',
+        color: Colors.primary,
+    },
+    stepperUnitText: {
+        fontSize: 13,
+        color: Colors.textMuted,
+        marginTop: -4,
     },
     errorCard: {
         backgroundColor: Colors.error + '15',
@@ -331,7 +652,7 @@ const styles = StyleSheet.create({
         padding: 14,
         borderWidth: 1,
         borderColor: Colors.error + '40',
-        marginTop: 8,
+        marginTop: 16,
     },
     errorText: {
         color: Colors.error,
@@ -342,8 +663,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 28,
-        paddingVertical: 16,
+        paddingHorizontal: 24,
+        paddingVertical: 14,
         borderTopWidth: 1,
         borderTopColor: Colors.border,
     },
@@ -378,8 +699,8 @@ const styles = StyleSheet.create({
     },
     skipButton: {
         alignItems: 'center',
-        paddingVertical: 12,
-        paddingBottom: 20,
+        paddingVertical: 10,
+        paddingBottom: 18,
     },
     skipText: {
         color: Colors.textMuted,
