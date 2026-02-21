@@ -92,25 +92,34 @@ function SearchableDropdown({
     return (
         <View style={ddStyles.container}>
             <Text style={ddStyles.label}>{label}</Text>
-            <TouchableOpacity
-                style={[ddStyles.trigger, open && ddStyles.triggerOpen]}
-                onPress={() => setOpen(!open)}
-                activeOpacity={0.7}
-            >
-                <Text style={value ? ddStyles.triggerText : ddStyles.triggerPlaceholder}>
-                    {value || placeholder}
-                </Text>
-                <Text style={ddStyles.arrow}>{open ? '▲' : '▼'}</Text>
-            </TouchableOpacity>
-            {open && (
-                <View style={ddStyles.listContainer}>
+            {open ? (
+                <View style={[ddStyles.trigger, ddStyles.triggerOpen]}>
                     <TextInput
-                        style={ddStyles.searchBox}
+                        style={ddStyles.inlineSearch}
                         value={search}
                         onChangeText={setSearch}
                         placeholder="🔍 Search..."
                         placeholderTextColor={Colors.textMuted}
+                        autoFocus
                     />
+                    <TouchableOpacity onPress={() => { setOpen(false); setSearch(''); }}>
+                        <Text style={ddStyles.arrow}>▲</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : (
+                <TouchableOpacity
+                    style={ddStyles.trigger}
+                    onPress={() => setOpen(true)}
+                    activeOpacity={0.7}
+                >
+                    <Text style={value ? ddStyles.triggerText : ddStyles.triggerPlaceholder}>
+                        {value || placeholder}
+                    </Text>
+                    <Text style={ddStyles.arrow}>▼</Text>
+                </TouchableOpacity>
+            )}
+            {open && (
+                <View style={ddStyles.listContainer}>
                     <ScrollView style={ddStyles.list} nestedScrollEnabled>
                         {filtered.map(o => (
                             <TouchableOpacity
@@ -162,6 +171,9 @@ const ddStyles = StyleSheet.create({
     searchBox: {
         paddingHorizontal: 14, paddingVertical: 10, fontSize: 15,
         color: Colors.text, borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    inlineSearch: {
+        flex: 1, fontSize: 16, color: Colors.text, paddingVertical: 0,
     },
     list: { maxHeight: 200 },
     item: {
@@ -311,7 +323,7 @@ const HOBBY_OPTIONS = [
     { label: 'Music', value: 'music', emoji: '🎵' },
     { label: 'Art', value: 'art', emoji: '🎨' },
     { label: 'Movies', value: 'movies', emoji: '🎬' },
-    { label: 'Travel', value: 'travel', emoji: '✈️' },
+
     { label: 'Photography', value: 'photography', emoji: '📸' },
     { label: 'Gardening', value: 'gardening', emoji: '🌱' },
     { label: 'Writing', value: 'writing', emoji: '✍️' },

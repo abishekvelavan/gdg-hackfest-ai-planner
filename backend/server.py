@@ -605,4 +605,4 @@ async def _schedule_alarm_from_response(user_id: str, response: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="10.14.220.208", port=8000)
