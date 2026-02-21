@@ -2,6 +2,9 @@
 
 from pymongo import MongoClient
 from datetime import datetime
+import hashlib
+import secrets
+import certifi
 
 # --- Connection ---
 MONGO_URI = "mongodb+srv://gdg_db_user:Gd8RUs7SnXXU9hdm@cluster0.de4d26o.mongodb.net/?appName=Cluster0"
@@ -15,11 +18,12 @@ def get_db():
     """Get or create the MongoDB connection."""
     global client, db
     if client is None:
-        client = MongoClient(MONGO_URI)
+        client = MongoClient(MONGO_URI, tlsCAFile=certifi.where(), tlsAllowInvalidCertificates=True)
         db = client[DB_NAME]
         # Ensure indexes
         db.profiles.create_index("user_id", unique=True)
         db.sleep_logs.create_index([("user_id", 1), ("logged_at", -1)])
+        db.users.create_index("email", unique=True)
         print(f"[DB] Connected to MongoDB: {DB_NAME}")
     return db
 
@@ -32,6 +36,54 @@ def close_db():
         client = None
         db = None
         print("[DB] MongoDB connection closed")
+
+
+# --- Auth Operations ---
+
+def _hash_password(password: str, salt: str = None) -> tuple[str, str]:
+    """Hash a password with salt. Returns (hash, salt)."""
+    if salt is None:
+        salt = secrets.token_hex(16)
+    hashed = hashlib.sha256((salt + password).encode()).hexdigest()
+    return hashed, salt
+
+
+def register_user(email: str, password: str, name: str = "") -> dict:
+    """Register a new user. Returns user dict or raises ValueError."""
+    database = get_db()
+    # Check if user already exists
+    existing = database.users.find_one({"email": email.lower().strip()})
+    if existing:
+        raise ValueError("Email already registered")
+    
+    hashed, salt = _hash_password(password)
+    user_id = secrets.token_hex(12)  # 24-char unique ID
+    
+    user = {
+        "user_id": user_id,
+        "email": email.lower().strip(),
+        "name": name.strip(),
+        "password_hash": hashed,
+        "password_salt": salt,
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    database.users.insert_one(user)
+    # Return without password fields
+    return {"user_id": user_id, "email": user["email"], "name": user["name"]}
+
+
+def login_user(email: str, password: str) -> dict:
+    """Login a user. Returns user dict or raises ValueError."""
+    database = get_db()
+    user = database.users.find_one({"email": email.lower().strip()})
+    if not user:
+        raise ValueError("Invalid email or password")
+    
+    hashed, _ = _hash_password(password, user["password_salt"])
+    if hashed != user["password_hash"]:
+        raise ValueError("Invalid email or password")
+    
+    return {"user_id": user["user_id"], "email": user["email"], "name": user["name"]}
 
 
 # --- Profile Operations ---

@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import Colors from '../constants/Colors';
 import { api } from '../services/api';
 import citiesData from '../cities.json';
+import { useAuth } from '../contexts/AuthContext';
 
 // --- Selectable Chip Component ---
 function Chip({
@@ -333,6 +334,7 @@ const GOAL_OPTIONS = [
 
 export default function WelcomeScreen() {
     const router = useRouter();
+    const { user } = useAuth();
     const [currentStep, setCurrentStep] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
@@ -447,6 +449,10 @@ export default function WelcomeScreen() {
             }));
 
             // Save directly to MongoDB via /api/profile
+            if (!user) {
+                throw new Error('User session not found. Please log in again.');
+            }
+
             await api.saveProfile({
                 name,
                 state: selectedState,
@@ -462,7 +468,7 @@ export default function WelcomeScreen() {
                 wake_time: wakeTime,
                 hobbies: hobbyData,
                 goals: allGoals,
-            });
+            }, user.user_id);
 
             router.replace('/(tabs)');
         } catch (err: any) {

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
     StyleSheet,
     View,
@@ -9,8 +9,10 @@ import {
 } from 'react-native';
 import Colors from '../../constants/Colors';
 import { api } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function SleepScreen() {
+    const { user } = useAuth();
     const [isLogging, setIsLogging] = useState(false);
     const [wakeTime, setWakeTime] = useState('');
     const [agentResponse, setAgentResponse] = useState('');
@@ -20,12 +22,16 @@ export default function SleepScreen() {
     const [hasLoggedSleep, setHasLoggedSleep] = useState(false);
 
     const logSleep = useCallback(async () => {
+        if (!user) {
+            setError('User session not found. Please log in again.');
+            return;
+        }
         setIsLogging(true);
         setError('');
 
         try {
             const bedtime = new Date().toISOString();
-            const response = await api.logSleep(bedtime);
+            const response = await api.logSleep(bedtime, user.user_id);
 
             setAgentResponse(response.response);
             setHasLoggedSleep(true);
@@ -39,19 +45,20 @@ export default function SleepScreen() {
         } finally {
             setIsLogging(false);
         }
-    }, []);
+    }, [user]);
 
     const fetchSleepHistory = useCallback(async () => {
+        if (!user) return;
         setIsLoadingHistory(true);
         try {
-            const response = await api.chat('Show my sleep history for the last 7 days');
+            const response = await api.chat('Show my sleep history for the last 7 days', user.user_id);
             setSleepHistory(response.response);
         } catch (err: any) {
             setSleepHistory('Could not fetch sleep history: ' + (err.message || 'Unknown error'));
         } finally {
             setIsLoadingHistory(false);
         }
-    }, []);
+    }, [user]);
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>

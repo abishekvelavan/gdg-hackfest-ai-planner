@@ -1,0 +1,24 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+backend/__pycache__/
+backend/day_planner/__pycache__/
+backend/day_planner/tools/__pycache__/
+backend/test_db.py
+
+# Node/Mobile
+node_modules/
+.expo/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+backend/.env
+backend/day_planner/.env
+firebase_config.json
+fcm_tokens.json

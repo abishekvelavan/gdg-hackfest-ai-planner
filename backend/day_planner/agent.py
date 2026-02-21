@@ -33,40 +33,43 @@ from .tools.profile_tools import (
 MODEL = "gemini-3.0-flash"
 
 
-# --- MCP Toolsets ---
+# --- MCP Toolsets (Temporarily disabled due to API changes) ---
 
-calendar_mcp_tools, calendar_mcp_exit = McpToolset.from_server(
-    connection_params=StdioServerParameters(
-        command="npx",
-        args=["-y", "@anthropic/mcp-google-calendar"],
-        env={
-            "GOOGLE_OAUTH_CREDENTIALS": os.getenv("GOOGLE_OAUTH_CREDENTIALS", ""),
-            **os.environ,
-        },
-    )
-)
+# calendar_mcp_tools, calendar_mcp_exit = McpToolset.from_server(
+#     connection_params=StdioServerParameters(
+#         command="npx",
+#         args=["-y", "@anthropic/mcp-google-calendar"],
+#         env={
+#             "GOOGLE_OAUTH_CREDENTIALS": os.getenv("GOOGLE_OAUTH_CREDENTIALS", ""),
+#             **os.environ,
+#         },
+#     )
+# )
+calendar_mcp_tools = []
 
-notion_mcp_tools, notion_mcp_exit = McpToolset.from_server(
-    connection_params=StdioServerParameters(
-        command="npx",
-        args=["-y", "@suekou/mcp-notion-server"],
-        env={
-            "NOTION_API_TOKEN": os.getenv("NOTION_TOKEN", ""),
-            **os.environ,
-        },
-    )
-)
+# notion_mcp_tools, notion_mcp_exit = McpToolset.from_server(
+#     connection_params=StdioServerParameters(
+#         command="npx",
+#         args=["-y", "@suekou/mcp-notion-server"],
+#         env={
+#             "NOTION_API_TOKEN": os.getenv("NOTION_TOKEN", ""),
+#             **os.environ,
+#         },
+#     )
+# )
+notion_mcp_tools = []
 
-maps_mcp_tools, maps_mcp_exit = McpToolset.from_server(
-    connection_params=StdioServerParameters(
-        command="npx",
-        args=["-y", "@modelcontextprotocol/server-google-maps"],
-        env={
-            "GOOGLE_MAPS_API_KEY": os.getenv("GOOGLE_MAPS_API_KEY", ""),
-            **os.environ,
-        },
-    )
-)
+# maps_mcp_tools, maps_mcp_exit = McpToolset.from_server(
+#     connection_params=StdioServerParameters(
+#         command="npx",
+#         args=["-y", "@modelcontextprotocol/server-google-maps"],
+#         env={
+#             "GOOGLE_MAPS_API_KEY": os.getenv("GOOGLE_MAPS_API_KEY", ""),
+#             **os.environ,
+#         },
+#     )
+# )
+maps_mcp_tools = []
 
 
 # --- Sub-Agents ---

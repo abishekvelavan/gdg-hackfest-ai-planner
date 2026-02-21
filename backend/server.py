@@ -35,7 +35,7 @@ from google.genai import types
 from day_planner.agent import root_agent
 
 # MongoDB
-from db import get_db, save_profile, get_profile, close_db
+from db import get_db, save_profile, get_profile, close_db, register_user, login_user
 
 
 # --- Config ---
@@ -103,6 +103,71 @@ class ProfileRequest(BaseModel):
     wake_time: str = ""
     hobbies: list[dict] = []
     goals: list[str] = []
+
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str = ""
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+# --- Lifespan ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start scheduler on startup, shut down on exit."""
+    scheduler.start()
+    # Connect to MongoDB
+    get_db()
+    print("[SERVER] Scheduler started, MongoDB connected")
+    yield
+    scheduler.shutdown()
+    close_db()
+    print("[SERVER] Scheduler stopped, MongoDB disconnected")
+
+
+# --- FastAPI App ---
+app = FastAPI(
+    title="Day Planner API",
+    description="Agentic Day Planner powered by Google ADK + Gemini 3.0 Flash",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# --- Auth Endpoints ---
+@app.post("/api/register")
+async def register(req: RegisterRequest):
+    """Register a new user with email/password."""
+    try:
+        user = register_user(req.email, req.password, req.name)
+        return {"status": "ok", "user": user}
+    except ValueError as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
+
+
+@app.post("/api/login")
+async def login(req: LoginRequest):
+    """Login with email/password."""
+    try:
+        user = login_user(req.email, req.password)
+        return {"status": "ok", "user": user}
+    except ValueError as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=401, content={"status": "error", "message": str(e)})
 
 
 # --- Helper Functions ---
@@ -212,34 +277,6 @@ async def trigger_morning_plan(user_id: str):
 
 
 # --- Lifespan ---
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Start scheduler on startup, shut down on exit."""
-    scheduler.start()
-    # Connect to MongoDB
-    get_db()
-    print("[SERVER] Scheduler started, MongoDB connected")
-    yield
-    scheduler.shutdown()
-    close_db()
-    print("[SERVER] Scheduler stopped, MongoDB disconnected")
-
-
-# --- FastAPI App ---
-app = FastAPI(
-    title="Day Planner API",
-    description="Agentic Day Planner powered by Google ADK + Gemini 3.0 Flash",
-    version="1.0.0",
-    lifespan=lifespan,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 # --- API Routes ---
@@ -403,4 +440,4 @@ async def _schedule_alarm_from_response(user_id: str, response: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="10.50.73.36", port=8000)

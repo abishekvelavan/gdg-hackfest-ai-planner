@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import Colors from '../../constants/Colors';
 import { api } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 type ProfileField = {
     key: string;
@@ -27,13 +28,13 @@ const PROFILE_FIELDS: ProfileField[] = [
     { key: 'office_address', label: 'Office Address', emoji: '🏬', placeholder: 'Work/school address' },
     { key: 'energy_type', label: 'Energy Type', emoji: '⚡', placeholder: 'morning person or night owl' },
     { key: 'peak_focus_hours', label: 'Peak Focus Hours', emoji: '🎯', placeholder: 'e.g. 9 AM - 12 PM' },
-    { key: 'transport', label: 'Transport', emoji: '🚗', placeholder: 'car, bike, walk, or transit' },
-    { key: 'exercise_preferences', label: 'Exercise', emoji: '🏃', placeholder: 'e.g. gym at 6 PM' },
-    { key: 'sleep_target', label: 'Sleep Target (hours)', emoji: '😴', placeholder: '7.5' },
-    { key: 'hobbies', label: 'Hobbies', emoji: '🎮', placeholder: 'reading, gaming, cooking...' },
+    { key: 'transport', label: 'Transport (comma separated)', emoji: '🚗', placeholder: 'car, bike, walk, or transit' },
+    { key: 'exercise_preferences', label: 'Exercise Preferences', emoji: '🏃', placeholder: 'e.g. gym at 6 PM' },
+    { key: 'hobbies', label: 'Hobbies (comma separated)', emoji: '🎮', placeholder: 'reading, gaming, cooking...' },
 ];
 
 export default function ProfileScreen() {
+    const { user, logout } = useAuth();
     const [formData, setFormData] = useState<Record<string, string>>({});
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
@@ -44,9 +45,11 @@ export default function ProfileScreen() {
 
     // Fetch profile on mount
     useEffect(() => {
-        fetchProfile();
-        checkHealth();
-    }, []);
+        if (user) {
+            fetchProfile();
+            checkHealth();
+        }
+    }, [user]);
 
     const checkHealth = useCallback(async () => {
         try {
@@ -58,56 +61,45 @@ export default function ProfileScreen() {
     }, []);
 
     const fetchProfile = useCallback(async () => {
+        if (!user) return;
         setIsFetching(true);
         setError('');
 
         try {
-            const response = await api.chat('Show me my current profile settings. List each field and its value.');
-            // Try to extract field values from the response
-            const text = response.response;
-            const newData: Record<string, string> = {};
+            const profile = await api.getProfile(user.user_id);
+            if (profile) {
+                // Flatten complex structure for simple text inputs if needed
+                const simpleData: Record<string, string> = { ...profile };
 
-            for (const field of PROFILE_FIELDS) {
-                // Look for patterns like "Name: John" or "name: John" in the response
-                const regex = new RegExp(`${field.label}[:\\s]+([^\\n]+)`, 'i');
-                const match = text.match(regex);
-                if (match) {
-                    newData[field.key] = match[1].trim().replace(/^\*\*|\*\*$/g, '');
+                // Handle complex fields like transport (array) or exercise (list of dicts)
+                if (Array.isArray(profile.transport)) {
+                    simpleData.transport = profile.transport.join(', ');
                 }
-            }
+                if (Array.isArray(profile.exercise)) {
+                    simpleData.exercise_preferences = profile.exercise.map((e: any) => `${e.activity} at ${e.time}`).join(', ');
+                }
+                if (Array.isArray(profile.hobbies)) {
+                    simpleData.hobbies = profile.hobbies.map((h: any) => h.activity ? `${h.activity} at ${h.time}` : h).join(', ');
+                }
 
-            if (Object.keys(newData).length > 0) {
-                setFormData(newData);
+                setFormData(simpleData);
             }
         } catch (err: any) {
-            // Not critical — user can fill in manually
             console.log('Could not fetch existing profile:', err.message);
+            setError('Failed to load profile from server.');
         } finally {
             setIsFetching(false);
         }
-    }, []);
+    }, [user]);
 
     const saveProfile = useCallback(async () => {
-        const filledFields = Object.entries(formData).filter(([_, v]) => v.trim());
-        if (filledFields.length === 0) {
-            Alert.alert('No data', 'Please fill in at least some fields before saving.');
-            return;
-        }
-
+        if (!user) return;
         setIsSaving(true);
         setError('');
         setSaveStatus('');
 
         try {
-            // Build a natural language message for the agent to save the profile
-            const parts = filledFields.map(([key, value]) => {
-                const field = PROFILE_FIELDS.find(f => f.key === key);
-                return `${field?.label || key}: ${value}`;
-            });
-
-            const message = `Save my profile with these details:\n${parts.join('\n')}`;
-            const response = await api.chat(message);
-
+            await api.saveProfile(formData, user.user_id);
             setSaveStatus('✅ Profile saved!');
             setTimeout(() => setSaveStatus(''), 3000);
         } catch (err: any) {
@@ -115,7 +107,18 @@ export default function ProfileScreen() {
         } finally {
             setIsSaving(false);
         }
-    }, [formData]);
+    }, [formData, user]);
+
+    const handleLogout = () => {
+        Alert.alert('Logout', 'Are you sure you want to log out?', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Logout', style: 'destructive', onPress: async () => {
+                    await logout();
+                }
+            },
+        ]);
+    };
 
     const updateField = (key: string, value: string) => {
         setFormData(prev => ({ ...prev, [key]: value }));
@@ -135,7 +138,15 @@ export default function ProfileScreen() {
             </View>
 
             {/* Header */}
-            <Text style={styles.title}>Your Profile</Text>
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.title}>Your Profile</Text>
+                    <Text style={styles.userEmail}>{user?.email}</Text>
+                </View>
+                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                    <Text style={styles.logoutText}>Logout</Text>
+                </TouchableOpacity>
+            </View>
             <Text style={styles.subtitle}>
                 These preferences help the agent optimize your day plan.
             </Text>
@@ -229,6 +240,30 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: Colors.text,
         marginBottom: 6,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    userEmail: {
+        fontSize: 14,
+        color: Colors.textSecondary,
+        fontWeight: '500',
+    },
+    logoutButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        backgroundColor: Colors.error + '20',
+        borderWidth: 1,
+        borderColor: Colors.error + '40',
+    },
+    logoutText: {
+        color: Colors.error,
+        fontSize: 13,
+        fontWeight: '600',
     },
     subtitle: {
         fontSize: 14,

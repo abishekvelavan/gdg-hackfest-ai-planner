@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../../constants/Colors';
 import { ChatMessage } from '../../types';
 import { api } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const QUICK_PROMPTS = [
     '📋 Plan my day',
@@ -23,6 +24,7 @@ const QUICK_PROMPTS = [
 ];
 
 export default function ChatScreen() {
+    const { user } = useAuth();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -30,7 +32,7 @@ export default function ChatScreen() {
     const flatListRef = useRef<FlatList>(null);
 
     const sendMessage = useCallback(async (text: string) => {
-        if (!text.trim() || isLoading) return;
+        if (!text.trim() || isLoading || !user) return;
 
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
@@ -44,7 +46,7 @@ export default function ChatScreen() {
         setIsLoading(true);
 
         try {
-            const response = await api.chat(text.trim(), 'default_user', sessionId);
+            const response = await api.chat(text.trim(), user.user_id, sessionId);
             setSessionId(response.session_id);
 
             const agentMsg: ChatMessage = {
