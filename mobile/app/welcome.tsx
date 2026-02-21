@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     StyleSheet,
     View,
@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import Colors from '../constants/Colors';
 import { api } from '../services/api';
+import citiesData from '../cities.json';
 
 // --- Selectable Chip Component ---
 function Chip({
@@ -232,6 +233,10 @@ export default function WelcomeScreen() {
     const [workHours, setWorkHours] = useState('');
     const [energyType, setEnergyType] = useState('');
     const [focusHours, setFocusHours] = useState('');
+    const [selectedState, setSelectedState] = useState('');
+    const [selectedCity, setSelectedCity] = useState('');
+    const [citySearch, setCitySearch] = useState('');
+    const [stateSearch, setStateSearch] = useState('');
     const [transports, setTransports] = useState<string[]>([]);
     const [exercises, setExercises] = useState<string[]>([]);
     const [exerciseTimes, setExerciseTimes] = useState<Record<string, string>>({});
@@ -241,13 +246,37 @@ export default function WelcomeScreen() {
     const [bedtime, setBedtime] = useState('');
     const [wakeTime, setWakeTime] = useState('');
 
+    // Derived data from cities.json
+    const uniqueStates = useMemo(() => {
+        const states = [...new Set(citiesData.map((c: any) => c.state))].sort();
+        return states;
+    }, []);
+
+    const filteredStates = useMemo(() => {
+        if (!stateSearch.trim()) return uniqueStates;
+        return uniqueStates.filter(s => s.toLowerCase().includes(stateSearch.toLowerCase()));
+    }, [uniqueStates, stateSearch]);
+
+    const citiesForState = useMemo(() => {
+        if (!selectedState) return [];
+        return citiesData
+            .filter((c: any) => c.state === selectedState)
+            .map((c: any) => c.name)
+            .sort();
+    }, [selectedState]);
+
+    const filteredCities = useMemo(() => {
+        if (!citySearch.trim()) return citiesForState;
+        return citiesForState.filter(c => c.toLowerCase().includes(citySearch.toLowerCase()));
+    }, [citiesForState, citySearch]);
+
     // "Other" custom text values
     const [customTransport, setCustomTransport] = useState('');
     const [customExercise, setCustomExercise] = useState('');
     const [customHobby, setCustomHobby] = useState('');
     const [customGoal, setCustomGoal] = useState('');
 
-    const TOTAL_STEPS = 5;
+    const TOTAL_STEPS = 7;
     const isLastStep = currentStep === TOTAL_STEPS - 1;
     const isFirstStep = currentStep === 0;
 
@@ -261,6 +290,8 @@ export default function WelcomeScreen() {
 
     const canProceed = () => {
         if (currentStep === 0) return name.trim().length > 0;
+        if (currentStep === 1) return selectedState.length > 0;
+        if (currentStep === 2) return selectedCity.length > 0;
         return true;
     };
 
@@ -306,6 +337,8 @@ export default function WelcomeScreen() {
             // Save directly to MongoDB via /api/profile
             await api.saveProfile({
                 name,
+                state: selectedState,
+                city: selectedCity,
                 home_address: homeAddress,
                 office_address: officeAddress,
                 work_hours: workHours,
@@ -348,8 +381,69 @@ export default function WelcomeScreen() {
                     </>
                 );
 
-            // --- Step 1: Location ---
+            // --- Step 1: Select State ---
             case 1:
+                return (
+                    <>
+                        <Text style={styles.stepEmoji}>🗺️</Text>
+                        <Text style={styles.stepTitle}>Your State</Text>
+                        <Text style={styles.stepSubtitle}>Select your state</Text>
+                        <TextInput
+                            style={styles.searchInput}
+                            value={stateSearch}
+                            onChangeText={setStateSearch}
+                            placeholder="🔍 Search states..."
+                            placeholderTextColor={Colors.textMuted}
+                        />
+                        <View style={styles.chipGroup}>
+                            {filteredStates.map(s => (
+                                <TouchableOpacity
+                                    key={s}
+                                    style={[styles.chip, selectedState === s && styles.chipSelected]}
+                                    onPress={() => { setSelectedState(s); setSelectedCity(''); setCitySearch(''); }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={[styles.chipText, selectedState === s && styles.chipTextSelected]}>{s}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </>
+                );
+
+            // --- Step 2: Select City ---
+            case 2:
+                return (
+                    <>
+                        <Text style={styles.stepEmoji}>🏙️</Text>
+                        <Text style={styles.stepTitle}>Your City</Text>
+                        <Text style={styles.stepSubtitle}>Select your city in {selectedState}</Text>
+                        <TextInput
+                            style={styles.searchInput}
+                            value={citySearch}
+                            onChangeText={setCitySearch}
+                            placeholder="🔍 Search cities..."
+                            placeholderTextColor={Colors.textMuted}
+                        />
+                        <View style={styles.chipGroup}>
+                            {filteredCities.map(c => (
+                                <TouchableOpacity
+                                    key={c}
+                                    style={[styles.chip, selectedCity === c && styles.chipSelected]}
+                                    onPress={() => setSelectedCity(c)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={[styles.chipText, selectedCity === c && styles.chipTextSelected]}>{c}</Text>
+                                </TouchableOpacity>
+                            ))}
+                            {filteredCities.length === 0 && (
+                                <Text style={styles.noCitiesText}>No cities found</Text>
+                            )}
+                        </View>
+                    </>
+                );
+
+            // --- Step 3: Location ---
+            case 3:
                 return (
                     <>
                         <Text style={styles.stepEmoji}>📍</Text>
@@ -378,8 +472,8 @@ export default function WelcomeScreen() {
                     </>
                 );
 
-            // --- Step 2: Schedule ---
-            case 2:
+            // --- Step 4: Schedule ---
+            case 4:
                 return (
                     <>
                         <Text style={styles.stepEmoji}>🕐</Text>
@@ -409,8 +503,8 @@ export default function WelcomeScreen() {
                     </>
                 );
 
-            // --- Step 3: Lifestyle ---
-            case 3:
+            // --- Step 5: Lifestyle ---
+            case 5:
                 return (
                     <>
                         <Text style={styles.stepEmoji}>🎯</Text>
@@ -504,8 +598,8 @@ export default function WelcomeScreen() {
                     </>
                 );
 
-            // --- Step 4: Goals & Sleep ---
-            case 4:
+            // --- Step 6: Goals & Sleep ---
+            case 6:
                 return (
                     <>
                         <Text style={styles.stepEmoji}>🚀</Text>
@@ -708,6 +802,23 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.primary + '50',
         marginTop: 10,
+    },
+    searchInput: {
+        backgroundColor: Colors.surfaceLight,
+        borderRadius: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        fontSize: 16,
+        color: Colors.text,
+        borderWidth: 1.5,
+        borderColor: Colors.primary + '40',
+        marginBottom: 16,
+    },
+    noCitiesText: {
+        color: Colors.textMuted,
+        fontSize: 15,
+        textAlign: 'center',
+        paddingVertical: 20,
     },
     activityTimeBlock: {
         backgroundColor: Colors.surface + '80',
