@@ -9,7 +9,7 @@ import 'react-native-reanimated';
 export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
-  initialRouteName: '(tabs)',
+  initialRouteName: 'welcome',
 };
 
 SplashScreen.preventAutoHideAsync();
@@ -46,8 +46,9 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={CustomDarkTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="welcome" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
