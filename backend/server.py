@@ -98,10 +98,10 @@ class ProfileRequest(BaseModel):
     energy_type: str = ""
     peak_focus_hours: str = ""
     transport: list[str] = []
-    exercise: list[str] = []
-    exercise_time: str = ""
-    sleep_target: float = 7.5
-    hobbies: list[str] = []
+    exercise: list[dict] = []
+    bedtime: str = ""
+    wake_time: str = ""
+    hobbies: list[dict] = []
     goals: list[str] = []
 
 

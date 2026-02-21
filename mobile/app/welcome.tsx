@@ -150,10 +150,45 @@ const EXERCISE_OPTIONS = [
     { label: 'Other', value: '__other_exercise__', emoji: '✏️' },
 ];
 
-const EXERCISE_TIME_OPTIONS = [
-    { label: 'Morning', value: 'morning', emoji: '🌅' },
-    { label: 'Afternoon', value: 'afternoon', emoji: '☀️' },
-    { label: 'Evening', value: 'evening', emoji: '🌆' },
+// Time slot options for exercises and hobbies
+const TIME_SLOT_OPTIONS = [
+    { label: '5–6 AM', value: '5 AM - 6 AM', emoji: '🌅' },
+    { label: '6–7 AM', value: '6 AM - 7 AM', emoji: '🌅' },
+    { label: '7–8 AM', value: '7 AM - 8 AM', emoji: '🌄' },
+    { label: '8–9 AM', value: '8 AM - 9 AM', emoji: '☀️' },
+    { label: '9–10 AM', value: '9 AM - 10 AM', emoji: '☀️' },
+    { label: '10–11 AM', value: '10 AM - 11 AM', emoji: '☀️' },
+    { label: '4–5 PM', value: '4 PM - 5 PM', emoji: '🌆' },
+    { label: '5–6 PM', value: '5 PM - 6 PM', emoji: '🌆' },
+    { label: '6–7 PM', value: '6 PM - 7 PM', emoji: '🌇' },
+    { label: '7–8 PM', value: '7 PM - 8 PM', emoji: '🌙' },
+    { label: '8–9 PM', value: '8 PM - 9 PM', emoji: '🌙' },
+];
+
+// Bedtime options
+const BEDTIME_OPTIONS = [
+    { label: '9 PM', value: '9 PM', emoji: '🌙' },
+    { label: '10 PM', value: '10 PM', emoji: '🌙' },
+    { label: '10:30 PM', value: '10:30 PM', emoji: '�' },
+    { label: '11 PM', value: '11 PM', emoji: '🌑' },
+    { label: '11:30 PM', value: '11:30 PM', emoji: '🌑' },
+    { label: '12 AM', value: '12 AM', emoji: '🕛' },
+    { label: '1 AM', value: '1 AM', emoji: '🦉' },
+    { label: '2 AM', value: '2 AM', emoji: '🦉' },
+];
+
+// Wake-up time options
+const WAKE_TIME_OPTIONS = [
+    { label: '5 AM', value: '5 AM', emoji: '🌅' },
+    { label: '5:30 AM', value: '5:30 AM', emoji: '🌅' },
+    { label: '6 AM', value: '6 AM', emoji: '🌄' },
+    { label: '6:30 AM', value: '6:30 AM', emoji: '🌄' },
+    { label: '7 AM', value: '7 AM', emoji: '☀️' },
+    { label: '7:30 AM', value: '7:30 AM', emoji: '☀️' },
+    { label: '8 AM', value: '8 AM', emoji: '☀️' },
+    { label: '8:30 AM', value: '8:30 AM', emoji: '☀️' },
+    { label: '9 AM', value: '9 AM', emoji: '🌞' },
+    { label: '10 AM', value: '10 AM', emoji: '�' },
 ];
 
 const HOBBY_OPTIONS = [
@@ -199,10 +234,12 @@ export default function WelcomeScreen() {
     const [focusHours, setFocusHours] = useState('');
     const [transports, setTransports] = useState<string[]>([]);
     const [exercises, setExercises] = useState<string[]>([]);
-    const [exerciseTime, setExerciseTime] = useState('');
+    const [exerciseTimes, setExerciseTimes] = useState<Record<string, string>>({});
     const [hobbies, setHobbies] = useState<string[]>([]);
+    const [hobbyTimes, setHobbyTimes] = useState<Record<string, string>>({});
     const [goals, setGoals] = useState<string[]>([]);
-    const [sleepTarget, setSleepTarget] = useState(7.5);
+    const [bedtime, setBedtime] = useState('');
+    const [wakeTime, setWakeTime] = useState('');
 
     // "Other" custom text values
     const [customTransport, setCustomTransport] = useState('');
@@ -254,6 +291,18 @@ export default function WelcomeScreen() {
             const allGoals = goals.filter(v => v !== '__other_goal__');
             if (goals.includes('__other_goal__') && customGoal.trim()) allGoals.push(customGoal.trim());
 
+            // Build exercise objects with times
+            const exerciseData = allExercises.map(ex => ({
+                activity: ex,
+                time: exerciseTimes[ex] || '',
+            }));
+
+            // Build hobby objects with times
+            const hobbyData = allHobbies.map(h => ({
+                activity: h,
+                time: hobbyTimes[h] || '',
+            }));
+
             // Save directly to MongoDB via /api/profile
             await api.saveProfile({
                 name,
@@ -263,10 +312,10 @@ export default function WelcomeScreen() {
                 energy_type: energyType,
                 peak_focus_hours: focusHours,
                 transport: allTransports,
-                exercise: allExercises,
-                exercise_time: exerciseTime,
-                sleep_target: sleepTarget,
-                hobbies: allHobbies,
+                exercise: exerciseData,
+                bedtime,
+                wake_time: wakeTime,
+                hobbies: hobbyData,
                 goals: allGoals,
             });
 
@@ -402,16 +451,22 @@ export default function WelcomeScreen() {
                             />
                         )}
 
-                        {exercises.length > 0 && !exercises.includes('none') && (
-                            <>
-                                <Text style={styles.sectionLabel}>Preferred Exercise Time</Text>
-                                <ChipGroup
-                                    options={EXERCISE_TIME_OPTIONS}
-                                    selected={exerciseTime ? [exerciseTime] : []}
-                                    onToggle={(v) => selectSingle(v, setExerciseTime)}
-                                />
-                            </>
-                        )}
+                        {/* Per-exercise time selectors */}
+                        {exercises.filter(e => e !== 'none' && e !== '__other_exercise__').map(ex => {
+                            const opt = EXERCISE_OPTIONS.find(o => o.value === ex);
+                            return (
+                                <View key={`time-${ex}`} style={styles.activityTimeBlock}>
+                                    <Text style={styles.activityTimeLabel}>
+                                        {opt?.emoji} {opt?.label || ex} — When?
+                                    </Text>
+                                    <ChipGroup
+                                        options={TIME_SLOT_OPTIONS}
+                                        selected={exerciseTimes[ex] ? [exerciseTimes[ex]] : []}
+                                        onToggle={(v) => setExerciseTimes(prev => ({ ...prev, [ex]: v === prev[ex] ? '' : v }))}
+                                    />
+                                </View>
+                            );
+                        })}
 
                         <Text style={styles.sectionLabel}>Hobbies</Text>
                         <ChipGroup
@@ -429,6 +484,23 @@ export default function WelcomeScreen() {
                                 placeholderTextColor={Colors.textMuted}
                             />
                         )}
+
+                        {/* Per-hobby time selectors */}
+                        {hobbies.filter(h => h !== '__other_hobby__').map(h => {
+                            const opt = HOBBY_OPTIONS.find(o => o.value === h);
+                            return (
+                                <View key={`time-${h}`} style={styles.activityTimeBlock}>
+                                    <Text style={styles.activityTimeLabel}>
+                                        {opt?.emoji} {opt?.label || h} — When?
+                                    </Text>
+                                    <ChipGroup
+                                        options={TIME_SLOT_OPTIONS}
+                                        selected={hobbyTimes[h] ? [hobbyTimes[h]] : []}
+                                        onToggle={(v) => setHobbyTimes(prev => ({ ...prev, [h]: v === prev[h] ? '' : v }))}
+                                    />
+                                </View>
+                            );
+                        })}
                     </>
                 );
 
@@ -457,14 +529,18 @@ export default function WelcomeScreen() {
                             />
                         )}
 
-                        <Text style={styles.sectionLabel}>Sleep Target</Text>
-                        <Stepper
-                            value={sleepTarget}
-                            min={4}
-                            max={12}
-                            step={0.5}
-                            unit="hours"
-                            onValueChange={setSleepTarget}
+                        <Text style={styles.sectionLabel}>🌙 Bedtime</Text>
+                        <ChipGroup
+                            options={BEDTIME_OPTIONS}
+                            selected={bedtime ? [bedtime] : []}
+                            onToggle={(v) => selectSingle(v, setBedtime)}
+                        />
+
+                        <Text style={styles.sectionLabel}>☀️ Wake-up Time</Text>
+                        <ChipGroup
+                            options={WAKE_TIME_OPTIONS}
+                            selected={wakeTime ? [wakeTime] : []}
+                            onToggle={(v) => selectSingle(v, setWakeTime)}
                         />
                     </>
                 );
@@ -632,6 +708,20 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.primary + '50',
         marginTop: 10,
+    },
+    activityTimeBlock: {
+        backgroundColor: Colors.surface + '80',
+        borderRadius: 14,
+        padding: 14,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: Colors.border,
+    },
+    activityTimeLabel: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: Colors.primary,
+        marginBottom: 10,
     },
     sectionLabel: {
         fontSize: 13,
