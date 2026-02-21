@@ -34,6 +34,9 @@ from google.genai import types
 # Import the agent
 from day_planner.agent import root_agent
 
+# MongoDB
+from db import get_db, save_profile, get_profile, close_db
+
 
 # --- Config ---
 DATA_DIR = Path(__file__).parent / "day_planner" / "data"
@@ -84,6 +87,22 @@ class NotificationRequest(BaseModel):
     title: str
     body: str
     user_id: str = "default_user"
+
+
+class ProfileRequest(BaseModel):
+    user_id: str = "default_user"
+    name: str = ""
+    home_address: str = ""
+    office_address: str = ""
+    work_hours: str = ""
+    energy_type: str = ""
+    peak_focus_hours: str = ""
+    transport: list[str] = []
+    exercise: list[str] = []
+    exercise_time: str = ""
+    sleep_target: float = 7.5
+    hobbies: list[str] = []
+    goals: list[str] = []
 
 
 # --- Helper Functions ---
@@ -197,10 +216,13 @@ async def trigger_morning_plan(user_id: str):
 async def lifespan(app: FastAPI):
     """Start scheduler on startup, shut down on exit."""
     scheduler.start()
-    print("[SERVER] Scheduler started")
+    # Connect to MongoDB
+    get_db()
+    print("[SERVER] Scheduler started, MongoDB connected")
     yield
     scheduler.shutdown()
-    print("[SERVER] Scheduler stopped")
+    close_db()
+    print("[SERVER] Scheduler stopped, MongoDB disconnected")
 
 
 # --- FastAPI App ---
@@ -328,7 +350,28 @@ async def health_check():
         "model": "gemini-3.0-flash",
         "scheduler_running": scheduler.running,
         "firebase_configured": firebase_app is not None,
+        "db_connected": get_db() is not None,
     }
+
+
+@app.post("/api/profile")
+async def save_user_profile(request: ProfileRequest):
+    """Save or update a user profile to MongoDB."""
+    try:
+        profile_data = request.model_dump(exclude={"user_id"})
+        saved = save_profile(request.user_id, profile_data)
+        return {"status": "saved", "profile": saved}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save profile: {str(e)}")
+
+
+@app.get("/api/profile/{user_id}")
+async def get_user_profile(user_id: str):
+    """Get a user profile from MongoDB."""
+    profile = get_profile(user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return profile
 
 
 async def _schedule_alarm_from_response(user_id: str, response: str):

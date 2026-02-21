@@ -101,4 +101,21 @@ export const api = {
      */
     healthCheck: (): Promise<HealthResponse> =>
         request<HealthResponse>('/api/health', { method: 'GET' }),
+
+    /**
+     * Save user profile to MongoDB.
+     * POST /api/profile
+     */
+    saveProfile: (profileData: Record<string, any>, userId = 'default_user'): Promise<any> =>
+        request<any>('/api/profile', {
+            method: 'POST',
+            body: JSON.stringify({ ...profileData, user_id: userId }),
+        }),
+
+    /**
+     * Get user profile from MongoDB.
+     * GET /api/profile/:userId
+     */
+    getProfile: (userId = 'default_user'): Promise<any> =>
+        request<any>(`/api/profile/${encodeURIComponent(userId)}`, { method: 'GET' }),
 };

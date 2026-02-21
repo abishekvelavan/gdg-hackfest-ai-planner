@@ -135,6 +135,7 @@ const TRANSPORT_OPTIONS = [
     { label: 'Transit', value: 'transit', emoji: '🚌' },
     { label: 'Train', value: 'train', emoji: '🚆' },
     { label: 'Scooter', value: 'scooter', emoji: '🛵' },
+    { label: 'Other', value: '__other_transport__', emoji: '✏️' },
 ];
 
 const EXERCISE_OPTIONS = [
@@ -146,6 +147,7 @@ const EXERCISE_OPTIONS = [
     { label: 'Sports', value: 'sports', emoji: '⚽' },
     { label: 'Walking', value: 'walking', emoji: '🚶' },
     { label: 'None', value: 'none', emoji: '🛋️' },
+    { label: 'Other', value: '__other_exercise__', emoji: '✏️' },
 ];
 
 const EXERCISE_TIME_OPTIONS = [
@@ -167,6 +169,7 @@ const HOBBY_OPTIONS = [
     { label: 'Writing', value: 'writing', emoji: '✍️' },
     { label: 'Social', value: 'social', emoji: '👥' },
     { label: 'Coding', value: 'coding', emoji: '💻' },
+    { label: 'Other', value: '__other_hobby__', emoji: '✏️' },
 ];
 
 const GOAL_OPTIONS = [
@@ -178,6 +181,7 @@ const GOAL_OPTIONS = [
     { label: 'Reduce stress', value: 'reduce stress', emoji: '🧘' },
     { label: 'Stay organized', value: 'stay organized', emoji: '📋' },
     { label: 'More free time', value: 'more free time', emoji: '🕐' },
+    { label: 'Other', value: '__other_goal__', emoji: '✏️' },
 ];
 
 export default function WelcomeScreen() {
@@ -199,6 +203,12 @@ export default function WelcomeScreen() {
     const [hobbies, setHobbies] = useState<string[]>([]);
     const [goals, setGoals] = useState<string[]>([]);
     const [sleepTarget, setSleepTarget] = useState(7.5);
+
+    // "Other" custom text values
+    const [customTransport, setCustomTransport] = useState('');
+    const [customExercise, setCustomExercise] = useState('');
+    const [customHobby, setCustomHobby] = useState('');
+    const [customGoal, setCustomGoal] = useState('');
 
     const TOTAL_STEPS = 5;
     const isLastStep = currentStep === TOTAL_STEPS - 1;
@@ -234,21 +244,31 @@ export default function WelcomeScreen() {
         setError('');
 
         try {
-            const parts: string[] = [];
-            if (name) parts.push(`Name: ${name}`);
-            if (homeAddress) parts.push(`Home Address: ${homeAddress}`);
-            if (officeAddress) parts.push(`Office Address: ${officeAddress}`);
-            if (workHours) parts.push(`Work Hours: ${workHours}`);
-            if (energyType) parts.push(`Energy Type: ${energyType}`);
-            if (focusHours) parts.push(`Peak Focus Hours: ${focusHours}`);
-            if (transports.length) parts.push(`Transport: ${transports.join(', ')}`);
-            if (exercises.length) parts.push(`Exercise: ${exercises.join(', ')}${exerciseTime ? ` (${exerciseTime})` : ''}`);
-            parts.push(`Sleep Target: ${sleepTarget} hours`);
-            if (hobbies.length) parts.push(`Hobbies: ${hobbies.join(', ')}`);
-            if (goals.length) parts.push(`Goals: ${goals.join(', ')}`);
+            // Merge selected options with custom "Other" text
+            const allTransports = transports.filter(v => v !== '__other_transport__');
+            if (transports.includes('__other_transport__') && customTransport.trim()) allTransports.push(customTransport.trim());
+            const allExercises = exercises.filter(v => v !== '__other_exercise__');
+            if (exercises.includes('__other_exercise__') && customExercise.trim()) allExercises.push(customExercise.trim());
+            const allHobbies = hobbies.filter(v => v !== '__other_hobby__');
+            if (hobbies.includes('__other_hobby__') && customHobby.trim()) allHobbies.push(customHobby.trim());
+            const allGoals = goals.filter(v => v !== '__other_goal__');
+            if (goals.includes('__other_goal__') && customGoal.trim()) allGoals.push(customGoal.trim());
 
-            const message = `Save my profile with these details:\n${parts.join('\n')}`;
-            await api.chat(message);
+            // Save directly to MongoDB via /api/profile
+            await api.saveProfile({
+                name,
+                home_address: homeAddress,
+                office_address: officeAddress,
+                work_hours: workHours,
+                energy_type: energyType,
+                peak_focus_hours: focusHours,
+                transport: allTransports,
+                exercise: allExercises,
+                exercise_time: exerciseTime,
+                sleep_target: sleepTarget,
+                hobbies: allHobbies,
+                goals: allGoals,
+            });
 
             router.replace('/(tabs)');
         } catch (err: any) {
@@ -355,6 +375,15 @@ export default function WelcomeScreen() {
                             onToggle={(v) => toggleInArray(transports, v, setTransports)}
                             multi
                         />
+                        {transports.includes('__other_transport__') && (
+                            <TextInput
+                                style={styles.otherInput}
+                                value={customTransport}
+                                onChangeText={setCustomTransport}
+                                placeholder="Type your transport..."
+                                placeholderTextColor={Colors.textMuted}
+                            />
+                        )}
 
                         <Text style={styles.sectionLabel}>Exercise</Text>
                         <ChipGroup
@@ -363,6 +392,15 @@ export default function WelcomeScreen() {
                             onToggle={(v) => toggleInArray(exercises, v, setExercises)}
                             multi
                         />
+                        {exercises.includes('__other_exercise__') && (
+                            <TextInput
+                                style={styles.otherInput}
+                                value={customExercise}
+                                onChangeText={setCustomExercise}
+                                placeholder="Type your exercise..."
+                                placeholderTextColor={Colors.textMuted}
+                            />
+                        )}
 
                         {exercises.length > 0 && !exercises.includes('none') && (
                             <>
@@ -382,6 +420,15 @@ export default function WelcomeScreen() {
                             onToggle={(v) => toggleInArray(hobbies, v, setHobbies)}
                             multi
                         />
+                        {hobbies.includes('__other_hobby__') && (
+                            <TextInput
+                                style={styles.otherInput}
+                                value={customHobby}
+                                onChangeText={setCustomHobby}
+                                placeholder="Type your hobby..."
+                                placeholderTextColor={Colors.textMuted}
+                            />
+                        )}
                     </>
                 );
 
@@ -400,6 +447,15 @@ export default function WelcomeScreen() {
                             onToggle={(v) => toggleInArray(goals, v, setGoals)}
                             multi
                         />
+                        {goals.includes('__other_goal__') && (
+                            <TextInput
+                                style={styles.otherInput}
+                                value={customGoal}
+                                onChangeText={setCustomGoal}
+                                placeholder="Type your goal..."
+                                placeholderTextColor={Colors.textMuted}
+                            />
+                        )}
 
                         <Text style={styles.sectionLabel}>Sleep Target</Text>
                         <Stepper
@@ -565,6 +621,17 @@ const styles = StyleSheet.create({
         color: Colors.text,
         borderWidth: 1,
         borderColor: Colors.border,
+    },
+    otherInput: {
+        backgroundColor: Colors.surfaceLight,
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 15,
+        color: Colors.text,
+        borderWidth: 1,
+        borderColor: Colors.primary + '50',
+        marginTop: 10,
     },
     sectionLabel: {
         fontSize: 13,

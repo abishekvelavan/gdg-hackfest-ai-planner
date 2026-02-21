@@ -9,3 +9,4 @@ apscheduler
 fastapi
 uvicorn[standard]
 firebase-admin
+pymongo[srv]
