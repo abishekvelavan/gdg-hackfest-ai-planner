@@ -15,6 +15,8 @@ import Colors from '../../constants/Colors';
 import { ChatMessage } from '../../types';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { ChatBubble } from '../../components/ChatBubble';
+import { AnimatedEntry } from '../../components/AnimatedScreen';
 
 const QUICK_PROMPTS = [
     '📋 Plan my day',
@@ -71,49 +73,35 @@ export default function ChatScreen() {
     }, [isLoading, sessionId]);
 
     const renderMessage = ({ item }: { item: ChatMessage }) => {
-        const isUser = item.role === 'user';
-        return (
-            <View style={[styles.messageRow, isUser && styles.messageRowUser]}>
-                {!isUser && (
-                    <View style={styles.avatarContainer}>
-                        <Text style={styles.avatarText}>🤖</Text>
-                    </View>
-                )}
-                <View
-                    style={[
-                        styles.messageBubble,
-                        isUser ? styles.userBubble : styles.agentBubble,
-                    ]}
-                >
-                    <Text style={[styles.messageText, isUser ? styles.userText : styles.agentText]}>
-                        {item.text}
-                    </Text>
-                    <Text style={[styles.timestamp, isUser && styles.timestampUser]}>
-                        {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                </View>
-            </View>
-        );
+        return <ChatBubble message={item} />;
     };
 
     const renderEmptyState = () => (
         <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>💬</Text>
-            <Text style={styles.emptyTitle}>Chat with your Day Planner</Text>
-            <Text style={styles.emptySubtitle}>
-                Ask me to plan your day, check weather, scan emails, or manage todos.
-            </Text>
-            <View style={styles.quickPromptsContainer}>
-                {QUICK_PROMPTS.map((prompt) => (
-                    <TouchableOpacity
-                        key={prompt}
-                        style={styles.quickPromptChip}
-                        onPress={() => sendMessage(prompt)}
-                    >
-                        <Text style={styles.quickPromptText}>{prompt}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+            <AnimatedEntry type="scaleIn" delay={0}>
+                <Text style={styles.emptyEmoji}>💬</Text>
+            </AnimatedEntry>
+            <AnimatedEntry delay={150}>
+                <Text style={styles.emptyTitle}>Chat with your Day Planner</Text>
+            </AnimatedEntry>
+            <AnimatedEntry delay={300}>
+                <Text style={styles.emptySubtitle}>
+                    Ask me to plan your day, check weather, scan emails, or manage todos.
+                </Text>
+            </AnimatedEntry>
+            <AnimatedEntry delay={450}>
+                <View style={styles.quickPromptsContainer}>
+                    {QUICK_PROMPTS.map((prompt) => (
+                        <TouchableOpacity
+                            key={prompt}
+                            style={styles.quickPromptChip}
+                            onPress={() => sendMessage(prompt)}
+                        >
+                            <Text style={styles.quickPromptText}>{prompt}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </AnimatedEntry>
         </View>
     );
 
@@ -204,61 +192,6 @@ const styles = StyleSheet.create({
     messagesListEmpty: {
         flex: 1,
         justifyContent: 'center',
-    },
-    messageRow: {
-        flexDirection: 'row',
-        marginBottom: 12,
-        alignItems: 'flex-end',
-    },
-    messageRowUser: {
-        justifyContent: 'flex-end',
-    },
-    avatarContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: Colors.surfaceLight,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 8,
-    },
-    avatarText: {
-        fontSize: 16,
-    },
-    messageBubble: {
-        maxWidth: '75%',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 18,
-    },
-    userBubble: {
-        backgroundColor: Colors.userBubble,
-        borderBottomRightRadius: 4,
-    },
-    agentBubble: {
-        backgroundColor: Colors.agentBubble,
-        borderBottomLeftRadius: 4,
-        borderWidth: 1,
-        borderColor: Colors.border,
-    },
-    messageText: {
-        fontSize: 15,
-        lineHeight: 21,
-    },
-    userText: {
-        color: Colors.userBubbleText,
-    },
-    agentText: {
-        color: Colors.agentBubbleText,
-    },
-    timestamp: {
-        fontSize: 10,
-        color: Colors.textMuted,
-        marginTop: 4,
-        alignSelf: 'flex-end',
-    },
-    timestampUser: {
-        color: 'rgba(255,255,255,0.6)',
     },
     typingIndicator: {
         paddingHorizontal: 16,

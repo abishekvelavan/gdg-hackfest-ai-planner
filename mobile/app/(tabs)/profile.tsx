@@ -12,6 +12,7 @@ import {
 import Colors from '../../constants/Colors';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { AnimatedEntry } from '../../components/AnimatedScreen';
 
 type ProfileField = {
     key: string;
@@ -127,29 +128,33 @@ export default function ProfileScreen() {
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
             {/* Server Status Badge */}
-            <View style={styles.statusBar}>
-                <View style={[
-                    styles.statusDot,
-                    { backgroundColor: serverStatus === 'connected' ? Colors.success : serverStatus === 'offline' ? Colors.error : Colors.warning }
-                ]} />
-                <Text style={styles.statusText}>
-                    {serverStatus === 'connected' ? 'Backend connected' : serverStatus === 'offline' ? 'Backend offline' : 'Checking...'}
-                </Text>
-            </View>
+            <AnimatedEntry delay={0} type="fadeIn">
+                <View style={styles.statusBar}>
+                    <View style={[
+                        styles.statusDot,
+                        { backgroundColor: serverStatus === 'connected' ? Colors.success : serverStatus === 'offline' ? Colors.error : Colors.warning }
+                    ]} />
+                    <Text style={styles.statusText}>
+                        {serverStatus === 'connected' ? 'Backend connected' : serverStatus === 'offline' ? 'Backend offline' : 'Checking...'}
+                    </Text>
+                </View>
+            </AnimatedEntry>
 
             {/* Header */}
-            <View style={styles.header}>
-                <View>
-                    <Text style={styles.title}>Your Profile</Text>
-                    <Text style={styles.userEmail}>{user?.email}</Text>
+            <AnimatedEntry delay={100}>
+                <View style={styles.header}>
+                    <View>
+                        <Text style={styles.title}>Your Profile</Text>
+                        <Text style={styles.userEmail}>{user?.email}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                        <Text style={styles.logoutText}>Logout</Text>
+                    </TouchableOpacity>
                 </View>
-                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                    <Text style={styles.logoutText}>Logout</Text>
-                </TouchableOpacity>
-            </View>
-            <Text style={styles.subtitle}>
-                These preferences help the agent optimize your day plan.
-            </Text>
+                <Text style={styles.subtitle}>
+                    These preferences help the agent optimize your day plan.
+                </Text>
+            </AnimatedEntry>
 
             {isFetching ? (
                 <View style={styles.loadingContainer}>
@@ -159,20 +164,22 @@ export default function ProfileScreen() {
             ) : (
                 <>
                     {/* Profile Fields */}
-                    {PROFILE_FIELDS.map((field) => (
-                        <View key={field.key} style={styles.fieldContainer}>
-                            <Text style={styles.fieldLabel}>
-                                {field.emoji} {field.label}
-                            </Text>
-                            <TextInput
-                                style={[styles.fieldInput, field.multiline && styles.fieldInputMultiline]}
-                                value={formData[field.key] || ''}
-                                onChangeText={(value) => updateField(field.key, value)}
-                                placeholder={field.placeholder}
-                                placeholderTextColor={Colors.textMuted}
-                                multiline={field.multiline}
-                            />
-                        </View>
+                    {PROFILE_FIELDS.map((field, index) => (
+                        <AnimatedEntry key={field.key} delay={200 + index * 80}>
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.fieldLabel}>
+                                    {field.emoji} {field.label}
+                                </Text>
+                                <TextInput
+                                    style={[styles.fieldInput, field.multiline && styles.fieldInputMultiline]}
+                                    value={formData[field.key] || ''}
+                                    onChangeText={(value) => updateField(field.key, value)}
+                                    placeholder={field.placeholder}
+                                    placeholderTextColor={Colors.textMuted}
+                                    multiline={field.multiline}
+                                />
+                            </View>
+                        </AnimatedEntry>
                     ))}
 
                     {/* Error */}
@@ -194,7 +201,7 @@ export default function ProfileScreen() {
                         disabled={isSaving}
                     >
                         {isSaving ? (
-                            <ActivityIndicator color="#FFF" />
+                            <ActivityIndicator color="#000" />
                         ) : (
                             <Text style={styles.saveButtonText}>💾 Save Profile</Text>
                         )}
@@ -334,7 +341,7 @@ const styles = StyleSheet.create({
         opacity: 0.7,
     },
     saveButtonText: {
-        color: '#FFF',
+        color: '#000000',
         fontSize: 16,
         fontWeight: '700',
     },
