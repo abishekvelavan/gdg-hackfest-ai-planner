@@ -23,7 +23,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.mobile",
+      "package": "com.gdghack.gdgchennai",
       "googleServicesFile": "./google-services.json"
     },
     "web": {
