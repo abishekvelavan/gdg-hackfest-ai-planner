@@ -20,7 +20,7 @@ export function normalizeChatResponse(payload: any): string {
 // Local dev: http://10.0.2.2:8000 (Android emulator), http://localhost:8000 (Expo web / same machine)
 // ngrok: https://your-ngrok-url.ngrok-free.app
 // Production: https://your-cloud-run-url
-const API_URL = 'http://localhost:8000';
+const API_URL = 'https://day-planner-api-752175666366.asia-south1.run.app';
 
 const DEFAULT_TIMEOUT = 60000; // 60s — agent responses can be slow
 
