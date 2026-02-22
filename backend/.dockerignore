@@ -1,0 +1,12 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+day_planner/.env
+day_planner/data/
+day_planner/__pycache__
+day_planner/tools/__pycache__
+.git
+.gitignore
+*.md
+firebase_config.json

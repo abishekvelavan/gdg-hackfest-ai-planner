@@ -15,6 +15,7 @@ RUN npm install -g @modelcontextprotocol/server-google-maps @suekou/mcp-notion-s
 # Copy application
 COPY . .
 
+ENV PORT=8080
 EXPOSE 8080
 
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD uvicorn server:app --host 0.0.0.0 --port $PORT

@@ -134,27 +134,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Explicit origins so CORS header is sent with allow_credentials=True (wildcard cannot be used with credentials)
-CORS_ORIGINS = [
-    "http://localhost:8081",
-    "http://localhost:3000",
-    "http://127.0.0.1:8081",
-    "http://127.0.0.1:3000",
-]
+# Allow all origins for dev; tighten for production
+CORS_ORIGINS = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=False,  # Cannot use credentials with wildcard origin
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
 def _cors_headers(origin: str | None) -> dict:
-    """Headers so browser accepts response when request came from a listed origin."""
-    if origin and origin in CORS_ORIGINS:
-        return {"Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true"}
-    return {"Access-Control-Allow-Origin": CORS_ORIGINS[0], "Access-Control-Allow-Credentials": "true"}
+    """Headers so browser accepts response when request came from any origin."""
+    return {"Access-Control-Allow-Origin": origin or "*"}
 
 
 @app.exception_handler(Exception)
@@ -605,4 +598,5 @@ async def _schedule_alarm_from_response(user_id: str, response: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)

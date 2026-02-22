@@ -1,5 +1,6 @@
 """MongoDB connection and profile collection helpers."""
 
+import os
 from pymongo import MongoClient
 from datetime import datetime
 import hashlib
@@ -7,7 +8,10 @@ import secrets
 import certifi
 
 # --- Connection ---
-MONGO_URI = "mongodb+srv://gdg_db_user:Gd8RUs7SnXXU9hdm@cluster0.de4d26o.mongodb.net/?appName=Cluster0"
+MONGO_URI = os.getenv(
+    "MONGO_URI",
+    "mongodb+srv://gdg_db_user:Gd8RUs7SnXXU9hdm@cluster0.de4d26o.mongodb.net/?appName=Cluster0",
+)
 DB_NAME = "day_planner"
 
 client: MongoClient = None
