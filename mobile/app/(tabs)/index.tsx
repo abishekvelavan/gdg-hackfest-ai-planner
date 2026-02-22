@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useLayoutEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -19,7 +19,7 @@ import { AffirmationCard } from '../../components/AffirmationCard';
 import { AnimatedEntry } from '../../components/AnimatedScreen';
 import { DayPlanLoader } from '../../components/DayPlanLoader';
 import { useAuth } from '../../contexts/AuthContext';
-import { useRouter } from 'expo-router'; // required for router.push('/map?url=...')
+import { useRouter, useNavigation } from 'expo-router';
 
 function parseEventsFromResponse(response: string): DayEvent[] {
   const events: DayEvent[] = [];
@@ -198,6 +198,28 @@ export default function DayPlanScreen() {
     }
   }, [user?.user_id, isSyncing, isLoading, fetchDayPlan]);
 
+  const navigation = useNavigation();
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: user?.user_id
+        ? () => (
+            <TouchableOpacity
+              onPress={handleSyncAndRegenerate}
+              disabled={isSyncing || isLoading}
+              style={styles.headerSyncButton}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              {(isSyncing && !isLoading) ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <FontAwesome name="refresh" size={18} color={isSyncing || isLoading ? Colors.textMuted : Colors.primary} />
+              )}
+            </TouchableOpacity>
+          )
+        : undefined,
+    });
+  }, [navigation, user?.user_id, handleSyncAndRegenerate, isSyncing, isLoading]);
+
   const addToCalendar = useCallback(async () => {
     if (!user?.user_id || events.length === 0) return;
     setCalendarAdding(true);
@@ -254,26 +276,6 @@ export default function DayPlanScreen() {
         />
       }
     >
-      {/* Sync & regenerate — resync Google data, then regenerate plan */}
-      {user?.user_id && (
-        <View style={styles.syncBar}>
-          <TouchableOpacity
-            style={[styles.syncButton, (isSyncing || isLoading) && styles.syncButtonDisabled]}
-            onPress={handleSyncAndRegenerate}
-            disabled={isSyncing || isLoading}
-          >
-            {isSyncing || isLoading ? (
-              <ActivityIndicator size="small" color={Colors.primary} style={styles.syncSpinner} />
-            ) : (
-              <FontAwesome name="refresh" size={16} color={Colors.primary} style={styles.syncIcon} />
-            )}
-            <Text style={styles.syncButtonText}>
-              {isSyncing ? 'Syncing Google…' : isLoading ? 'Regenerating…' : 'Sync & regenerate'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {/* Morning Affirmation */}
       {events.length > 0 && affirmationVisible && (
         <AffirmationCard
@@ -373,38 +375,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  syncBar: {
-    flexDirection: 'row',
+  headerSyncButton: {
+    marginRight: 12,
+    padding: 8,
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    backgroundColor: Colors.surfaceLight,
-  },
-  syncButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: Colors.primary + '18',
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  syncButtonDisabled: {
-    opacity: 0.7,
-  },
-  syncIcon: {
-    marginRight: 8,
-  },
-  syncSpinner: {
-    marginRight: 8,
-  },
-  syncButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primary,
   },
   weatherBar: {
     backgroundColor: Colors.surfaceLight,

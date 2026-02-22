@@ -70,6 +70,7 @@ export default function TabLayout() {
         name="index"
         options={{
           headerTitle: () => <DayPlanHeaderTitle />,
+          title: 'Your Plan',
           tabBarIcon: ({ color }) => <TabBarIcon name="calendar" color={color} />,
         }}
       />
