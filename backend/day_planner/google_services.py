@@ -3,8 +3,11 @@
 Loads OAuth tokens from DB (no Google ADK). Builds Credentials and services per user_id.
 """
 
+import os
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -134,6 +137,10 @@ def fetch_calendar_events(user_id: str, days_ahead: int = 1) -> dict:
         return {"error": str(e), "events": []}
 
 
+# Timezone for calendar events (e.g. IST). Use env CALENDAR_TIMEZONE or default Asia/Kolkata.
+CALENDAR_TIMEZONE = os.getenv("CALENDAR_TIMEZONE", "Asia/Kolkata")
+
+
 def create_calendar_events_from_plan(
     user_id: str,
     events: list[dict],
@@ -143,14 +150,20 @@ def create_calendar_events_from_plan(
     """
     Create Google Calendar events from a day plan. Each event gets a reminder `reminder_minutes` before.
     events: list of {"time": "9:00 AM", "title": "...", "location": "" (optional)}
-    date_str: "YYYY-MM-DD" for the day; defaults to today UTC.
+    date_str: "YYYY-MM-DD" for the day; defaults to today in CALENDAR_TIMEZONE (e.g. IST).
     """
     service = get_calendar_service(user_id)
     if not service:
         return {"error": "Google not connected", "created": 0, "ids": []}
 
+    try:
+        tz = ZoneInfo(CALENDAR_TIMEZONE)
+    except Exception:
+        tz = ZoneInfo("Asia/Kolkata")
+
     if not date_str:
-        date_str = datetime.utcnow().strftime("%Y-%m-%d")
+        now_local = datetime.now(tz)
+        date_str = now_local.strftime("%Y-%m-%d")
 
     created_ids = []
     for ev in events:
@@ -160,18 +173,23 @@ def create_calendar_events_from_plan(
         if not time_str or not title:
             continue
 
-        # Parse "9:00 AM" / "14:30" into hour, minute
+        # Parse "9:00 AM" / "7:00 PM" / "14:30" into hour, minute (handle "00 PM" in second part)
         hour, minute = 9, 0
         try:
             parts = time_str.replace(".", ":").split(":")
             hour = int(parts[0].strip())
-            minute = int(parts[1].strip()) if len(parts) > 1 else 0
-            rest = (parts[-1] if len(parts) > 1 else parts[0]).upper()
-            if "PM" in rest and hour < 12:
-                hour += 12
-            elif "AM" in rest and hour == 12:
-                hour = 0
-        except (ValueError, IndexError):
+            if len(parts) > 1:
+                last = (parts[-1] or "").strip().upper()
+                # Minute may be "00" or "00 AM" or "30 PM" – take leading digits only
+                min_match = re.match(r"^(\d{1,2})", last)
+                minute = int(min_match.group(1)) if min_match else 0
+                if "PM" in last and hour < 12:
+                    hour += 12
+                elif "AM" in last and hour == 12:
+                    hour = 0
+            else:
+                minute = 0
+        except (ValueError, IndexError, AttributeError):
             pass
 
         start_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(
@@ -185,8 +203,8 @@ def create_calendar_events_from_plan(
         body = {
             "summary": title,
             "location": location or None,
-            "start": {"dateTime": start_iso, "timeZone": "UTC"},
-            "end": {"dateTime": end_iso, "timeZone": "UTC"},
+            "start": {"dateTime": start_iso, "timeZone": CALENDAR_TIMEZONE},
+            "end": {"dateTime": end_iso, "timeZone": CALENDAR_TIMEZONE},
             "reminders": {
                 "useDefault": False,
                 "overrides": [{"method": "popup", "minutes": reminder_minutes}],

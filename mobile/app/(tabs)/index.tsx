@@ -80,8 +80,8 @@ function parseEventsFromResponse(response: string): DayEvent[] {
       else if (titleLower.match(/break|lunch|coffee|rest|free/)) category = 'break';
       else if (titleLower.match(/focus|study|deep work|concentrate|read/)) category = 'focus';
 
-      // Clean up title (remove priority tags if present in middle)
-      const title = rest
+      // Clean up title (remove priority tags, leading time duplicate, trailing " 9am" etc.)
+      let title = rest
         .replace(/\s*\[(?:High|Medium|Low|P[123])\]\s*/gi, ' ')
         .replace(/📍[^🚗🚲🚶🚌]*/g, '')
         .replace(/[🚗🚲🚶🚌]\s*\d*\s*min/g, '')
@@ -89,6 +89,9 @@ function parseEventsFromResponse(response: string): DayEvent[] {
         .replace(/\*\*/g, '')
         .trim()
         .replace(/^[-–—]\s*/, '');
+      // Strip leading time so we don't show it twice (badge already shows event.time)
+      title = title.replace(/^\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?\s*[-–—:]\s*/i, '').trim();
+      title = title.replace(/\s*,?\s*\d{1,2}\s*(?:AM|PM|am|pm)\s*$/i, '').trim();
 
       if (title) {
         events.push({ time, title, location, travelMode, weather, category, priority });

@@ -38,10 +38,16 @@ type EventTileProps = {
     order?: number;
 };
 
+// Avoid showing time twice: title may sometimes still contain "9:00 AM: " from the plan text
+function stripLeadingTimeFromTitle(title: string): string {
+    return title.replace(/^\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?\s*[-–—:]\s*/i, '').trim() || title;
+}
+
 export function EventTile({ event, onPress, originForDirections, onOpenMap, order }: EventTileProps) {
     const categoryColor = CATEGORY_COLORS[event.category] || Colors.work;
     const categoryIcon = CATEGORY_ICONS[event.category] || '📌';
     const directionsUrl = event.location ? buildDirectionsUrl(originForDirections || '', event.location) : '';
+    const displayTitle = stripLeadingTimeFromTitle(event.title);
 
     const priorityLabel = event.priority ? event.priority : null;
     const priorityColor = event.priority === 'High' ? Colors.error : event.priority === 'Medium' ? Colors.primary : Colors.textSecondary;
@@ -66,7 +72,7 @@ export function EventTile({ event, onPress, originForDirections, onOpenMap, orde
             <View style={styles.eventBody}>
                 <Text style={styles.eventIcon}>{categoryIcon}</Text>
                 <View style={styles.eventDetails}>
-                    <Text style={styles.eventTitle}>{event.title}</Text>
+                    <Text style={styles.eventTitle}>{displayTitle}</Text>
                     {event.location && (
                         <Text style={styles.eventLocation}>📍 {event.location}</Text>
                     )}
