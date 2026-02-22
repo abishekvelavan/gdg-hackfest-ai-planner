@@ -18,6 +18,7 @@ yarn-error.log*
 
 # Environment
 .env
+mobile/.env
 backend/.env
 backend/day_planner/.env
 firebase_config.json

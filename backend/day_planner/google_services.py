@@ -134,6 +134,79 @@ def fetch_calendar_events(user_id: str, days_ahead: int = 1) -> dict:
         return {"error": str(e), "events": []}
 
 
+def create_calendar_events_from_plan(
+    user_id: str,
+    events: list[dict],
+    reminder_minutes: int = 15,
+    date_str: str | None = None,
+) -> dict:
+    """
+    Create Google Calendar events from a day plan. Each event gets a reminder `reminder_minutes` before.
+    events: list of {"time": "9:00 AM", "title": "...", "location": "" (optional)}
+    date_str: "YYYY-MM-DD" for the day; defaults to today UTC.
+    """
+    service = get_calendar_service(user_id)
+    if not service:
+        return {"error": "Google not connected", "created": 0, "ids": []}
+
+    if not date_str:
+        date_str = datetime.utcnow().strftime("%Y-%m-%d")
+
+    created_ids = []
+    for ev in events:
+        time_str = (ev.get("time") or "").strip()
+        title = (ev.get("title") or "Event").strip()
+        location = (ev.get("location") or "").strip()
+        if not time_str or not title:
+            continue
+
+        # Parse "9:00 AM" / "14:30" into hour, minute
+        hour, minute = 9, 0
+        try:
+            parts = time_str.replace(".", ":").split(":")
+            hour = int(parts[0].strip())
+            minute = int(parts[1].strip()) if len(parts) > 1 else 0
+            rest = (parts[-1] if len(parts) > 1 else parts[0]).upper()
+            if "PM" in rest and hour < 12:
+                hour += 12
+            elif "AM" in rest and hour == 12:
+                hour = 0
+        except (ValueError, IndexError):
+            pass
+
+        start_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(
+            hour=hour, minute=minute, second=0, microsecond=0
+        )
+        end_dt = start_dt + timedelta(minutes=30)
+
+        start_iso = start_dt.strftime("%Y-%m-%dT%H:%M:%S")
+        end_iso = end_dt.strftime("%Y-%m-%dT%H:%M:%S")
+
+        body = {
+            "summary": title,
+            "location": location or None,
+            "start": {"dateTime": start_iso, "timeZone": "UTC"},
+            "end": {"dateTime": end_iso, "timeZone": "UTC"},
+            "reminders": {
+                "useDefault": False,
+                "overrides": [{"method": "popup", "minutes": reminder_minutes}],
+            },
+        }
+        try:
+            created = service.events().insert(
+                calendarId="primary",
+                body=body,
+            ).execute()
+            created_ids.append(created.get("id", ""))
+        except Exception as e:
+            return {
+                "error": str(e),
+                "created": len(created_ids),
+                "ids": created_ids,
+            }
+    return {"created": len(created_ids), "ids": created_ids}
+
+
 def fetch_google_tasks(user_id: str, max_lists: int = 5) -> dict:
     """Fetch task lists and their tasks for user."""
     service = get_tasks_service(user_id)

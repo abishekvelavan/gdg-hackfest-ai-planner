@@ -16,12 +16,10 @@ export function normalizeChatResponse(payload: any): string {
     return String(raw ?? '');
 }
 
-// Change this to your backend URL
-// Local dev: http://10.0.2.2:8000 (Android emulator), http://localhost:8000 (Expo web / same machine)
-// ngrok: https://your-ngrok-url.ngrok-free.app
-// Production: https://your-cloud-run-url
+// Backend URL: from EXPO_PUBLIC_API_URL (e.g. in .env or EAS env). Use deployed URL for production.
+// Local: http://localhost:8000 | Android emulator: http://10.0.2.2:8000
+//const API_URL = 'https://day-planner-api-752175666366.asia-south1.run.app';
 const API_URL = 'http://localhost:8000';
-
 const DEFAULT_TIMEOUT = 60000; // 60s — agent responses can be slow
 
 async function request<T>(
@@ -204,4 +202,26 @@ export const api = {
             `/api/google/sync?user_id=${encodeURIComponent(userId)}`,
             { method: 'GET' }
         ),
+
+    /**
+     * Add day plan events to Google Calendar with 15-minute-before reminder.
+     * POST /api/plan/add-to-calendar
+     */
+    addPlanToCalendar: (
+        userId: string,
+        events: { time: string; title: string; location?: string }[],
+        reminderMinutes: number = 15
+    ): Promise<{ created: number; ids: string[]; error?: string }> =>
+        request<any>('/api/plan/add-to-calendar', {
+            method: 'POST',
+            body: JSON.stringify({
+                user_id: userId,
+                events: events.map((e) => ({
+                    time: e.time,
+                    title: e.title,
+                    location: e.location || '',
+                })),
+                reminder_minutes: reminderMinutes,
+            }),
+        }),
 };

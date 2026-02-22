@@ -1,3 +1,5 @@
+export type Priority = 'High' | 'Medium' | 'Low';
+
 export type DayEvent = {
   time: string;        // "9:00 AM"
   title: string;       // "Team Meeting"
@@ -6,6 +8,7 @@ export type DayEvent = {
   travelTime?: string; // "25 min"
   category: string;    // "work" | "health" | "errand" | "break" | "focus"
   weather?: string;    // "☀️ 28°C"
+  priority?: Priority; // High = must-do, Medium = important, Low = nice-to-do
 };
 
 export type DayPlan = {

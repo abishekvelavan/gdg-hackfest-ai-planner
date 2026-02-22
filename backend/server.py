@@ -29,6 +29,7 @@ from firebase_admin import credentials as fb_credentials, messaging
 
 # LangGraph + Gemini agent (no ADK)
 from day_planner.agent import run_chat
+from day_planner.tools.maps_tools import get_directions as maps_get_directions, recommend_travel_mode as maps_recommend_travel_mode
 
 # MongoDB
 from db import get_db, save_profile, get_profile, close_db, register_user, login_user, save_google_tokens, get_google_tokens
@@ -102,6 +103,18 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class PlanEventItem(BaseModel):
+    time: str  # e.g. "9:00 AM"
+    title: str
+    location: str = ""
+
+
+class AddToCalendarRequest(BaseModel):
+    user_id: str = "default_user"
+    events: list[PlanEventItem]
+    reminder_minutes: int = 15
 
 
 class GoogleTokensFromClientRequest(BaseModel):
@@ -325,6 +338,26 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/plan/add-to-calendar")
+async def add_plan_to_calendar(request: AddToCalendarRequest):
+    """Create Google Calendar events from the day plan with a reminder 15 minutes before each event."""
+    try:
+        from day_planner.google_services import create_calendar_events_from_plan
+        events_payload = [{"time": e.time, "title": e.title, "location": e.location or ""} for e in request.events]
+        result = create_calendar_events_from_plan(
+            user_id=request.user_id,
+            events=events_payload,
+            reminder_minutes=request.reminder_minutes,
+        )
+        if result.get("error") and result.get("created", 0) == 0:
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to create events"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/sleep")
 async def log_sleep_and_schedule(request: SleepRequest):
     """Log bedtime and schedule morning alarm."""
@@ -404,7 +437,8 @@ async def send_notification(request: NotificationRequest):
 
 @app.get("/api/health")
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint. Includes routes so you can confirm /api/plan/add-to-calendar is loaded after restart."""
+    routes = [r.path for r in app.routes if hasattr(r, "path") and r.path.startswith("/api/")]
     return {
         "status": "healthy",
         "agent": "day_planner",
@@ -412,6 +446,7 @@ async def health_check():
         "scheduler_running": scheduler.running,
         "firebase_configured": firebase_app is not None,
         "db_connected": get_db() is not None,
+        "routes": sorted(set(routes)),
     }
 
 
@@ -433,6 +468,33 @@ async def get_user_profile(user_id: str):
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     return profile
+
+
+# --- Maps (Google Maps Distance Matrix + travel recommendation) ---
+@app.get("/api/maps/directions")
+async def api_maps_directions(
+    origin: str = Query(..., description="Origin address or place"),
+    destination: str = Query(..., description="Destination address or place"),
+    mode: str = Query("driving", description="driving, walking, bicycling, or transit"),
+):
+    """Get travel time and distance between two places. Uses GOOGLE_MAPS_API_KEY or GOOGLE_API_KEY."""
+    result = maps_get_directions(origin=origin, destination=destination, mode=mode)
+    if result.get("error") and "status" not in result:
+        raise HTTPException(status_code=503, detail=result.get("error", "Maps unavailable"))
+    return result
+
+
+@app.get("/api/maps/recommend-travel")
+async def api_maps_recommend_travel(
+    origin: str = Query(..., description="Origin address or place"),
+    destination: str = Query(..., description="Destination address or place"),
+    city: str = Query("", description="City for weather (optional)"),
+):
+    """Recommend travel mode (car/bike/walk/transit) with reason. Uses Maps + weather."""
+    result = maps_recommend_travel_mode(origin=origin, destination=destination, city=city or "")
+    if result.get("error") and "recommended_mode" not in result:
+        raise HTTPException(status_code=503, detail=result.get("error", "Maps unavailable"))
+    return result
 
 
 # --- Google OAuth (Gmail, Calendar, Tasks) — no Google ADK ---

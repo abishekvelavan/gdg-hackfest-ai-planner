@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs } from 'expo-router';
 import Colors from '../../constants/Colors';
@@ -6,6 +7,36 @@ import Colors from '../../constants/Colors';
 function TabBarIcon(props: { name: React.ComponentProps<typeof FontAwesome>['name']; color: string }) {
   return <FontAwesome size={22} style={{ marginBottom: -3 }} {...props} />;
 }
+
+function DayPlanHeaderTitle() {
+  return (
+    <View style={headerStyles.container}>
+      <Image
+        source={require('../../assets/images/icon.png')}
+        style={headerStyles.logo}
+        resizeMode="contain"
+      />
+      <Text style={headerStyles.title} numberOfLines={1}>Your Day Ahead</Text>
+    </View>
+  );
+}
+
+const headerStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  logo: {
+    width: 28,
+    height: 28,
+  },
+  title: {
+    fontWeight: '700',
+    fontSize: 18,
+    color: Colors.text,
+  },
+});
 
 export default function TabLayout() {
   return (
@@ -38,7 +69,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Day Plan',
+          headerTitle: () => <DayPlanHeaderTitle />,
           tabBarIcon: ({ color }) => <TabBarIcon name="calendar" color={color} />,
         }}
       />

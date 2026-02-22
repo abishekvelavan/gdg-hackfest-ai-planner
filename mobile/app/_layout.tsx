@@ -79,6 +79,7 @@ export default function RootLayout() {
             <Stack.Screen name="welcome" />
             <Stack.Screen name="connect-google" />
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="map" options={{ presentation: 'card' }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
           </Stack>
           {showSplash && (

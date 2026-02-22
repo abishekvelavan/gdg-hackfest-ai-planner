@@ -92,25 +92,34 @@ function SearchableDropdown({
     return (
         <View style={ddStyles.container}>
             <Text style={ddStyles.label}>{label}</Text>
-            <TouchableOpacity
-                style={[ddStyles.trigger, open && ddStyles.triggerOpen]}
-                onPress={() => setOpen(!open)}
-                activeOpacity={0.7}
-            >
-                <Text style={value ? ddStyles.triggerText : ddStyles.triggerPlaceholder}>
-                    {value || placeholder}
-                </Text>
-                <Text style={ddStyles.arrow}>{open ? '▲' : '▼'}</Text>
-            </TouchableOpacity>
-            {open && (
-                <View style={ddStyles.listContainer}>
+            {open ? (
+                <View style={[ddStyles.trigger, ddStyles.triggerOpen]}>
                     <TextInput
-                        style={ddStyles.searchBox}
+                        style={ddStyles.inlineSearch}
                         value={search}
                         onChangeText={setSearch}
                         placeholder="🔍 Search..."
                         placeholderTextColor={Colors.textMuted}
+                        autoFocus
                     />
+                    <TouchableOpacity onPress={() => { setOpen(false); setSearch(''); }}>
+                        <Text style={ddStyles.arrow}>▲</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : (
+                <TouchableOpacity
+                    style={ddStyles.trigger}
+                    onPress={() => setOpen(true)}
+                    activeOpacity={0.7}
+                >
+                    <Text style={value ? ddStyles.triggerText : ddStyles.triggerPlaceholder}>
+                        {value || placeholder}
+                    </Text>
+                    <Text style={ddStyles.arrow}>▼</Text>
+                </TouchableOpacity>
+            )}
+            {open && (
+                <View style={ddStyles.listContainer}>
                     <ScrollView style={ddStyles.list} nestedScrollEnabled>
                         {filtered.map(o => (
                             <TouchableOpacity
@@ -162,6 +171,9 @@ const ddStyles = StyleSheet.create({
     searchBox: {
         paddingHorizontal: 14, paddingVertical: 10, fontSize: 15,
         color: Colors.text, borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    inlineSearch: {
+        flex: 1, fontSize: 16, color: Colors.text, paddingVertical: 0,
     },
     list: { maxHeight: 200 },
     item: {
@@ -777,10 +789,13 @@ export default function WelcomeScreen() {
                     disabled={!canProceed() || isSaving}
                 >
                     {isSaving ? (
-                        <ActivityIndicator color="#FFF" size="small" />
+                        <ActivityIndicator color={(!canProceed() || isSaving) ? '#FFF' : '#000'} size="small" />
                     ) : (
-                        <Text style={styles.nextButtonText}>
-                            {isLastStep ? '🚀 Let\'s Go!' : 'Next →'}
+                        <Text style={[
+                            styles.nextButtonText,
+                            (!canProceed()) && styles.nextButtonTextOnDisabled,
+                        ]}>
+                            {isLastStep ? 'Let\'s Go' : 'Next →'}
                         </Text>
                     )}
                 </TouchableOpacity>
@@ -832,6 +847,7 @@ const styles = StyleSheet.create({
         fontSize: 52,
         textAlign: 'center',
         marginBottom: 12,
+        opacity: 0.95,
     },
     stepTitle: {
         fontSize: 28,
@@ -1043,13 +1059,16 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.surfaceElevated,
     },
     finishButton: {
-        backgroundColor: Colors.success,
+        backgroundColor: Colors.primary,
         paddingHorizontal: 32,
     },
     nextButtonText: {
-        color: '#FFF',
+        color: '#000000',
         fontSize: 16,
         fontWeight: '700',
+    },
+    nextButtonTextOnDisabled: {
+        color: '#FFFFFF',
     },
     skipButton: {
         alignItems: 'center',
@@ -1057,7 +1076,7 @@ const styles = StyleSheet.create({
         paddingBottom: 18,
     },
     skipText: {
-        color: Colors.textMuted,
+        color: Colors.textSecondary,
         fontSize: 13,
     },
 });

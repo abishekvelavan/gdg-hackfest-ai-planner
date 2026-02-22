@@ -6,24 +6,48 @@ import {
   TouchableOpacity,
   ScrollView,
   RefreshControl,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import Colors from '../../constants/Colors';
 import { api, normalizeChatResponse } from '../../services/api';
 import { DayEvent } from '../../types';
 import { EventTile } from '../../components/EventTile';
 import { PlanCard } from '../../components/PlanCard';
 import { AffirmationCard } from '../../components/AffirmationCard';
-import { AnimatedEntry, PulseAnimation } from '../../components/AnimatedScreen';
+import { AnimatedEntry } from '../../components/AnimatedScreen';
 import { DayPlanLoader } from '../../components/DayPlanLoader';
 import { useAuth } from '../../contexts/AuthContext';
+import { useRouter } from 'expo-router'; // required for router.push('/map?url=...')
 
 function parseEventsFromResponse(response: string): DayEvent[] {
   const events: DayEvent[] = [];
   const lines = response.split('\n');
 
+  const parsePriority = (s: string): 'High' | 'Medium' | 'Low' | undefined => {
+    const upper = s.trim();
+    if (/^High$/i.test(upper)) return 'High';
+    if (/^Medium$/i.test(upper)) return 'Medium';
+    if (/^Low$/i.test(upper)) return 'Low';
+    if (upper === 'P1') return 'High';
+    if (upper === 'P2') return 'Medium';
+    if (upper === 'P3') return 'Low';
+    return undefined;
+  };
   for (const line of lines) {
-    // Match patterns like "⏰ 9:00 AM - Meeting" or "9:00 AM - Meeting" or "**9:00 AM** - Meeting"
-    const timeMatch = line.match(/(?:⏰\s*)?(?:\*\*)?(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)(?:\*\*)?\s*[-–—:]\s*(.+)/);
+    // Match [High], [Medium], [Low] or legacy [P1], [P2], [P3]
+    let priority: 'High' | 'Medium' | 'Low' | undefined;
+    let workLine = line;
+    const priAtStart = line.match(/^\s*\[(High|Medium|Low|P[123])\]\s*/i);
+    if (priAtStart) {
+      priority = parsePriority(priAtStart[1]);
+      workLine = line.slice(priAtStart[0].length);
+    } else {
+      const priAnywhere = line.match(/\[(High|Medium|Low|P[123])\]/i);
+      if (priAnywhere) priority = parsePriority(priAnywhere[1]);
+    }
+    const timeMatch = workLine.match(/(?:⏰\s*)?(?:\*\*)?(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)(?:\*\*)?\s*[-–—:]\s*(.+)/);
     if (timeMatch) {
       const time = timeMatch[1].trim();
       let rest = timeMatch[2].trim();
@@ -56,8 +80,9 @@ function parseEventsFromResponse(response: string): DayEvent[] {
       else if (titleLower.match(/break|lunch|coffee|rest|free/)) category = 'break';
       else if (titleLower.match(/focus|study|deep work|concentrate|read/)) category = 'focus';
 
-      // Clean up title
+      // Clean up title (remove priority tags if present in middle)
       const title = rest
+        .replace(/\s*\[(?:High|Medium|Low|P[123])\]\s*/gi, ' ')
         .replace(/📍[^🚗🚲🚶🚌]*/g, '')
         .replace(/[🚗🚲🚶🚌]\s*\d*\s*min/g, '')
         .replace(/(☀️|🌤️|⛅|🌧️|⛈️|❄️)\s*\d+°[CF]?/g, '')
@@ -66,7 +91,7 @@ function parseEventsFromResponse(response: string): DayEvent[] {
         .replace(/^[-–—]\s*/, '');
 
       if (title) {
-        events.push({ time, title, location, travelMode, weather, category });
+        events.push({ time, title, location, travelMode, weather, category, priority });
       }
     }
   }
@@ -94,6 +119,7 @@ function getPlanSections(planText: string): { intro: string; scheduleLines: stri
 
 export default function DayPlanScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const [events, setEvents] = useState<DayEvent[]>([]);
   const [rawPlan, setRawPlan] = useState('');
   const [weatherSummary, setWeatherSummary] = useState('');
@@ -102,6 +128,17 @@ export default function DayPlanScreen() {
   const [error, setError] = useState('');
   const [hasFetched, setHasFetched] = useState(false);
   const [affirmationVisible, setAffirmationVisible] = useState(true);
+  const [homeAddress, setHomeAddress] = useState<string>('');
+  const [calendarAdding, setCalendarAdding] = useState(false);
+  const [calendarMessage, setCalendarMessage] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  React.useEffect(() => {
+    if (!user?.user_id) return;
+    api.getProfile(user.user_id).then((p) => {
+      if (p?.home_address) setHomeAddress(String(p.home_address));
+    }).catch(() => {});
+  }, [user?.user_id]);
 
   const fetchDayPlan = useCallback(async (isPullRefresh = false) => {
     if (isPullRefresh) setIsRefreshing(true);
@@ -109,10 +146,19 @@ export default function DayPlanScreen() {
     setError('');
     setAffirmationVisible(true);
 
+    const userId = user?.user_id ?? 'default_user';
+
     try {
+      // Sync latest data from Google (Calendar, Gmail, Tasks) before generating the plan
+      try {
+        await api.getGoogleSync(userId);
+      } catch (_) {
+        // Proceed without Google data if not connected or sync fails
+      }
+
       const response = await api.chat(
         'Plan my day. Give me a time-blocked schedule with weather and travel info. Use ⏰ emoji before each time slot and 📍 for locations.',
-        user?.user_id ?? 'default_user',
+        userId,
         ''
       );
 
@@ -134,6 +180,50 @@ export default function DayPlanScreen() {
     }
   }, [user?.user_id]);
 
+  // Auto-fetch day plan when user lands on this page
+  React.useEffect(() => {
+    if (user?.user_id) fetchDayPlan();
+  }, [user?.user_id, fetchDayPlan]);
+
+  const handleSyncAndRegenerate = useCallback(async () => {
+    if (!user?.user_id || isSyncing || isLoading) return;
+    setIsSyncing(true);
+    setError('');
+    try {
+      await fetchDayPlan();
+    } catch (err: any) {
+      setError(err.message || 'Sync or plan failed');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [user?.user_id, isSyncing, isLoading, fetchDayPlan]);
+
+  const addToCalendar = useCallback(async () => {
+    if (!user?.user_id || events.length === 0) return;
+    setCalendarAdding(true);
+    setCalendarMessage(null);
+    try {
+      const result = await api.addPlanToCalendar(
+        user.user_id,
+        events.map((e) => ({ time: e.time, title: e.title, location: e.location })),
+        15
+      );
+      if (result.error && (result.created ?? 0) === 0) {
+        setCalendarMessage(result.error);
+        Alert.alert('Calendar', result.error);
+      } else {
+        const msg = `Added ${result.created ?? 0} events to Google Calendar. You'll get a reminder 15 minutes before each.`;
+        setCalendarMessage(msg);
+      }
+    } catch (err: any) {
+      const msg = err.message || 'Failed to add to calendar';
+      setCalendarMessage(msg);
+      Alert.alert('Calendar', msg);
+    } finally {
+      setCalendarAdding(false);
+    }
+  }, [user?.user_id, events]);
+
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <AnimatedEntry type="scaleIn" delay={0}>
@@ -144,19 +234,8 @@ export default function DayPlanScreen() {
       </AnimatedEntry>
       <AnimatedEntry delay={300}>
         <Text style={styles.emptySubtitle}>
-          Tap the button below or go to Chat and say "Plan my day"
+          Pull down to refresh and load your day plan
         </Text>
-      </AnimatedEntry>
-      <AnimatedEntry delay={450}>
-        <PulseAnimation>
-          <TouchableOpacity style={styles.generateButton} onPress={() => fetchDayPlan()}>
-            {isLoading ? (
-              <ActivityIndicator color="#000" />
-            ) : (
-              <Text style={styles.generateButtonText}>✨ Generate Day Plan</Text>
-            )}
-          </TouchableOpacity>
-        </PulseAnimation>
       </AnimatedEntry>
     </View>
   );
@@ -175,6 +254,26 @@ export default function DayPlanScreen() {
         />
       }
     >
+      {/* Sync & regenerate — resync Google data, then regenerate plan */}
+      {user?.user_id && (
+        <View style={styles.syncBar}>
+          <TouchableOpacity
+            style={[styles.syncButton, (isSyncing || isLoading) && styles.syncButtonDisabled]}
+            onPress={handleSyncAndRegenerate}
+            disabled={isSyncing || isLoading}
+          >
+            {isSyncing || isLoading ? (
+              <ActivityIndicator size="small" color={Colors.primary} style={styles.syncSpinner} />
+            ) : (
+              <FontAwesome name="refresh" size={16} color={Colors.primary} style={styles.syncIcon} />
+            )}
+            <Text style={styles.syncButtonText}>
+              {isSyncing ? 'Syncing Google…' : isLoading ? 'Regenerating…' : 'Sync & regenerate'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Morning Affirmation */}
       {events.length > 0 && affirmationVisible && (
         <AffirmationCard
@@ -198,10 +297,28 @@ export default function DayPlanScreen() {
         </View>
       ) : null}
 
-      {/* Events via PlanCard */}
+      {/* Events via PlanCard + Add to Calendar */}
       {events.length > 0 && (
         <View style={styles.eventsContainer}>
-          <PlanCard plan={{ date: new Date().toISOString().split('T')[0], events, weather_summary: weatherSummary }} />
+          <PlanCard
+            plan={{ date: new Date().toISOString().split('T')[0], events, weather_summary: weatherSummary }}
+            homeAddress={homeAddress || undefined}
+            onOpenMap={(url) => router.push('/map?url=' + encodeURIComponent(url))}
+          />
+          <TouchableOpacity
+            style={styles.addToCalendarButton}
+            onPress={addToCalendar}
+            disabled={calendarAdding}
+          >
+            {calendarAdding ? (
+              <ActivityIndicator color="#000" size="small" />
+            ) : (
+              <Text style={styles.addToCalendarText}>📅 Add to Google Calendar (reminder 15 min before)</Text>
+            )}
+          </TouchableOpacity>
+          {calendarMessage ? (
+            <Text style={styles.calendarMessage}>{calendarMessage}</Text>
+          ) : null}
         </View>
       )}
 
@@ -256,6 +373,39 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  syncBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    backgroundColor: Colors.surfaceLight,
+  },
+  syncButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: Colors.primary + '18',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  syncButtonDisabled: {
+    opacity: 0.7,
+  },
+  syncIcon: {
+    marginRight: 8,
+  },
+  syncSpinner: {
+    marginRight: 8,
+  },
+  syncButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
   weatherBar: {
     backgroundColor: Colors.surfaceLight,
     paddingHorizontal: 16,
@@ -295,6 +445,26 @@ const styles = StyleSheet.create({
   },
   eventsContainer: {
     padding: 16,
+  },
+  addToCalendarButton: {
+    marginTop: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.primary + '30',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+  },
+  addToCalendarText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  calendarMessage: {
+    marginTop: 8,
+    fontSize: 13,
+    color: Colors.textSecondary,
   },
   sectionTitle: {
     fontSize: 16,
@@ -375,18 +545,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
-  },
-  generateButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 16,
-    minWidth: 200,
-    alignItems: 'center',
-  },
-  generateButtonText: {
-    color: '#000000',
-    fontSize: 16,
-    fontWeight: '700',
   },
 });

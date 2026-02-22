@@ -8,6 +8,7 @@ import {
     ScrollView,
     ActivityIndicator,
     Alert,
+    Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Colors from '../../constants/Colors';
@@ -115,14 +116,20 @@ export default function ProfileScreen() {
     }, [formData, user]);
 
     const handleLogout = () => {
-        Alert.alert('Logout', 'Are you sure you want to log out?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Logout', style: 'destructive', onPress: async () => {
-                    await logout();
-                }
-            },
-        ]);
+        const doLogout = async () => {
+            await logout();
+            router.replace('/login');
+        };
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
+            if (window.confirm('Are you sure you want to log out?')) {
+                doLogout();
+            }
+        } else {
+            Alert.alert('Logout', 'Are you sure you want to log out?', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Logout', style: 'destructive', onPress: doLogout },
+            ]);
+        }
     };
 
     const updateField = (key: string, value: string) => {

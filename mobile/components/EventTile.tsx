@@ -1,7 +1,8 @@
 import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Linking } from 'react-native';
 import Colors from '../constants/Colors';
 import { DayEvent } from '../types';
+import { buildDirectionsUrl } from '../utils/mapsUrl';
 
 const CATEGORY_COLORS: Record<string, string> = {
     work: Colors.work,
@@ -29,11 +30,23 @@ const TRAVEL_ICONS: Record<string, string> = {
 type EventTileProps = {
     event: DayEvent;
     onPress?: () => void;
+    /** Origin address for "View route on map" (previous event location or home). */
+    originForDirections?: string;
+    /** When set, open map URL in-app; otherwise open in browser/Maps. */
+    onOpenMap?: (url: string) => void;
+    /** Order of this task in the day (1-based), shown next to priority. */
+    order?: number;
 };
 
-export function EventTile({ event, onPress }: EventTileProps) {
+export function EventTile({ event, onPress, originForDirections, onOpenMap, order }: EventTileProps) {
     const categoryColor = CATEGORY_COLORS[event.category] || Colors.work;
     const categoryIcon = CATEGORY_ICONS[event.category] || '📌';
+    const directionsUrl = event.location ? buildDirectionsUrl(originForDirections || '', event.location) : '';
+
+    const priorityLabel = event.priority ? event.priority : null;
+    const priorityColor = event.priority === 'High' ? Colors.error : event.priority === 'Medium' ? Colors.primary : Colors.textSecondary;
+    const priorityBg = event.priority === 'High' ? Colors.error + '30' : event.priority === 'Medium' ? Colors.primary + '25' : Colors.textSecondary + '30';
+    const priorityDisplay = priorityLabel && order != null ? `${priorityLabel} · #${order}` : priorityLabel;
 
     return (
         <View style={[styles.eventCard, { borderLeftColor: categoryColor }]} onTouchEnd={onPress}>
@@ -41,7 +54,14 @@ export function EventTile({ event, onPress }: EventTileProps) {
                 <View style={[styles.timeBadge, { backgroundColor: categoryColor + '20' }]}>
                     <Text style={[styles.timeText, { color: categoryColor }]}>{event.time}</Text>
                 </View>
-                {event.weather && <Text style={styles.weatherBadge}>{event.weather}</Text>}
+                <View style={styles.headerRight}>
+                    {priorityDisplay ? (
+                        <View style={[styles.priorityBadge, { backgroundColor: priorityBg, borderWidth: 1, borderColor: priorityColor }]}>
+                            <Text style={[styles.priorityText, { color: priorityColor }]}>{priorityDisplay}</Text>
+                        </View>
+                    ) : null}
+                    {event.weather ? <Text style={styles.weatherBadge}>{event.weather}</Text> : null}
+                </View>
             </View>
             <View style={styles.eventBody}>
                 <Text style={styles.eventIcon}>{categoryIcon}</Text>
@@ -55,6 +75,17 @@ export function EventTile({ event, onPress }: EventTileProps) {
                             {TRAVEL_ICONS[event.travelMode] || '🚗'} {event.travelTime || event.travelMode}
                         </Text>
                     )}
+                    {directionsUrl ? (
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (onOpenMap) onOpenMap(directionsUrl);
+                                else Linking.openURL(directionsUrl).catch(() => {});
+                            }}
+                            style={styles.mapLink}
+                        >
+                            <Text style={styles.mapLinkText}>View route on map</Text>
+                        </TouchableOpacity>
+                    ) : null}
                 </View>
             </View>
         </View>
@@ -77,12 +108,26 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 8,
     },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
     timeBadge: {
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 8,
     },
     timeText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    priorityBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    priorityText: {
         fontSize: 12,
         fontWeight: '700',
     },
@@ -116,5 +161,13 @@ const styles = StyleSheet.create({
     eventTravel: {
         fontSize: 12,
         color: Colors.accent,
+    },
+    mapLink: {
+        marginTop: 8,
+    },
+    mapLinkText: {
+        fontSize: 13,
+        color: Colors.primary,
+        fontWeight: '600',
     },
 });
